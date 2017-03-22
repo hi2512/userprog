@@ -117,14 +117,16 @@ struct thread
 
     int exit_status;
 
-    char *name_only;
+    char name_only[16];
     
   };
 
 struct exit_status {
 
   struct thread *t;
+  int tid;
   struct semaphore ready;
+  struct semaphore loaded;
   int status;
   struct list_elem elem;
   

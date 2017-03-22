@@ -51,17 +51,15 @@ process_execute (const char *file_name)
   }
 
   
-  char name[256];
-  strlcpy(name, file_name, strlen(file_name) + 1);
-  
-
+  char *my_copy = palloc_get_page(0);
+  strlcpy (my_copy, file_name, PGSIZE);
   char *tok_ptr1;
-  char *file_only = strtok_r(file_name, " ", &tok_ptr1);
+  char *file_only = strtok_r(my_copy, " ", &tok_ptr1);
 
   
   //attach full cmd_line for exit print
   struct exit_status *es = tid_to_child(tid);
-  es->t->name_only = file_only;
+  strlcpy(es->t->name_only, file_only, 16);
   
 
   return tid;
@@ -120,7 +118,7 @@ struct exit_status * tid_to_child(tid_t tid) {
     //printf("thread tid %d is checking es for thread tid %d\n", cur->tid, es->t->tid);
     // sema_down(&es->ready);
     //printf("DONE  ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
-    if(es->t->tid == tid) {
+    if(es->tid == tid) {
       result = es;
       break;
     }
@@ -136,7 +134,7 @@ void tid_remove(tid_t tid) {
   while(e != list_end(&cur->children)) {
     //check for valid pid
     struct exit_status *es = list_entry(e, struct exit_status, elem);
-    if(es->t->tid == tid) {
+    if(es->tid == tid) {
       //remove from the list
       list_remove(e);
       return;
@@ -159,7 +157,8 @@ int
 process_wait (tid_t child_tid) 
 {
 
-  // printf("process wait called with: %d\n", child_tid);
+  //printf("process wait by %d called with: %d\n",
+  //	 thread_current()->tid, child_tid);
   
   
   int res_status;
@@ -169,20 +168,21 @@ process_wait (tid_t child_tid)
     // printf("not a tid waiting on\n");
     return -1;
   } else {
-    //printf("es: %d retrieved, ready val: %d\n", waitee->t->tid,
+    // printf("es: %d retrieved, ready val: %d\n", waitee->tid,
     //	   waitee->ready.value);
-    //effect: only will wait for a tid once
     sema_down(&waitee->ready);
+    //printf("es: %d %d READY,\n", waitee->t->tid, waitee->tid);
   }
   
 
   struct thread *cur = thread_current();
-  sema_down(&cur->wait_sem);
+  //sema_down(&cur->wait_sem);
   res_status = waitee->status;
   tid_remove( child_tid );
   //free(waitee);
 
-  //printf("process wait for thread tid %d COMPLETE\n", cur->tid);
+  //printf("process wait for thread tid %d waiting on %d COMPLETE\n",
+  //	 cur->tid, child_tid);
   return res_status;
 
   //sema_up(thread_current()->wait_sem);
@@ -199,7 +199,7 @@ process_exit (void)
   uint32_t *pd;
 
   // printf("finished process\n");
-
+  //printf("exiting tid: %d\n", cur->tid);
   
   if(cur->name_only != NULL) {
     printf("%s: exit(%d)\n", cur->name_only, cur->exit_status);

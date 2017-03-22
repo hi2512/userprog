@@ -147,7 +147,7 @@ struct exit_status *get_es(struct thread *t) {
   struct list_elem *e = list_begin(&par->children);
   while(e != list_end(&par->children)) {
     struct exit_status *es = list_entry(e, struct exit_status, elem);
-    if(es->t == t) {
+    if(es->tid == t->tid) {
       res = es;
       break;
     }
@@ -159,16 +159,25 @@ struct exit_status *get_es(struct thread *t) {
 
 
 void exit(int status) {
+
+
   
   //printf("status: %d\n", status);
   struct thread *cur = thread_current();
   if(cur->parent != NULL) {
-    struct exit_status *es = get_es(cur);
+    //struct exit_status *es = get_es(cur);
+    struct exit_status *es = cur->status_in_parent;
     es->status = status;
     cur->exit_status = status;
-    sema_up(&cur->parent->wait_sem);
-    //printf("par is %s, wait sem val: %d\n", cur->parent->name, cur->parent->wait_sem.value);
+    // sema_up(&cur->parent->wait_sem);
+    sema_up(&es->ready);
+    //printf("par is %s, es ready val: %d\n", cur->parent->name, es->ready.value);
+    //printf("es tid is: %d\n", es->tid);
+  } else {
+     printf("has no parent???\n");
   }
+  /*
+  
   //printf("remove\n");
   //REMOVE PARENT FROM CHILDREN
   struct list_elem *e = NULL;
@@ -179,6 +188,8 @@ void exit(int status) {
     es->t->parent = NULL;
     //free(es);
   }
+  */
+
   //printf("%s: exit(%d)\n", cur->name_only, cur->exit_status);
   
   thread_exit();
@@ -189,7 +200,7 @@ tid_t exec(const char *cmd_line) {
   //check for load to be finished????
   tid_t res = process_execute(cmd_line);
 
-  //sema_down(&thread_current()->exec_sem);
+  sema_down(&thread_current()->exec_sem);
   //printf("exec sem down\n");
   return res;
   
