@@ -1,3 +1,4 @@
+
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
@@ -13,6 +14,7 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "threads/malloc.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -199,8 +201,27 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  //ADD userprog
+  struct thread *cur = thread_current();
+  t->parent = cur;
+  // printf("parent assigned: %s\n", cur->name);
+  // printf("par tid: %d my tid: %d\n", cur->tid, t->tid);
+  struct exit_status *es = malloc(sizeof(struct exit_status));
+  es->t = t;
+
+  es->status = -1;
+  list_push_back (&cur->children, &es->elem);
+
+  t->status_in_parent = es;
+
+  t->name_only = NULL;
+
+  //set ready?
+  sema_init(&es->ready, 1);
+  // printf("READY SETTTTTTTTTTTTTTTT\n");
   /* Add to run queue. */
   thread_unblock (t);
+
 
   return tid;
 }
@@ -469,6 +490,19 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable();
   list_push_back (&all_list, &t->allelem);
   intr_set_level(old_level);
+
+  //add for userprog
+  sema_init(&t->wait_sem, 0);
+  t->parent = NULL;
+  list_init(&t->children);
+  sema_init(&t->exec_sem, 0);
+  int i;
+  for(i = 0; i < 128; i++) {
+    t->files[i] = NULL;
+  }
+  t->exit_status = -1;
+  
+  
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

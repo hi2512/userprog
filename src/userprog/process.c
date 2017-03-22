@@ -21,6 +21,8 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+struct exit_status * tid_to_child(tid_t tid);
+
 
 
 /* Starts a new thread running a user program loaded from
@@ -44,12 +46,24 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
    tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  //tid = thread_create (file_only, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
   }
 
   
+  char name[256];
+  strlcpy(name, file_name, strlen(file_name) + 1);
+  
+
+  char *tok_ptr1;
+  char *file_only = strtok_r(file_name, " ", &tok_ptr1);
+
+  
+  //attach full cmd_line for exit print
+  struct exit_status *es = tid_to_child(tid);
+  es->t->name_only = file_only;
+  
+
   return tid;
 }
 
@@ -62,6 +76,7 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -69,7 +84,14 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  printf("finished load\n");
+  //printf("finished load\n");
+
+  // sema_up(&thread_current()->status_in_parent->ready);
+  //finished thread load
+  //printf("finished thread is %s\n", thread_current()->name);
+  
+  //sema_up(&thread_current()->exec_sem);
+  // printf("exec sem val: %d\n", thread_current()->exec_sem.value);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -86,6 +108,44 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
+
+struct exit_status * tid_to_child(tid_t tid) {
+
+  struct thread *result = NULL;
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->children);
+  while(e != list_end(&cur->children)) {
+    //check for valid pid
+    struct exit_status *es = list_entry(e, struct exit_status, elem);
+    //printf("thread tid %d is checking es for thread tid %d\n", cur->tid, es->t->tid);
+    // sema_down(&es->ready);
+    //printf("DONE  ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
+    if(es->t->tid == tid) {
+      result = es;
+      break;
+    }
+    e = list_next(e);
+  }
+  return result;
+
+}
+
+void tid_remove(tid_t tid) {
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->children);
+  while(e != list_end(&cur->children)) {
+    //check for valid pid
+    struct exit_status *es = list_entry(e, struct exit_status, elem);
+    if(es->t->tid == tid) {
+      //remove from the list
+      list_remove(e);
+      return;
+    }
+    e = list_next(e);
+  }
+}
+
+
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -96,13 +156,39 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  while(1) {
 
+  // printf("process wait called with: %d\n", child_tid);
+  
+  
+  int res_status;
+
+  struct exit_status *waitee = tid_to_child(child_tid);
+  if( (waitee == NULL) ) {
+    // printf("not a tid waiting on\n");
+    return -1;
+  } else {
+    //printf("es: %d retrieved, ready val: %d\n", waitee->t->tid,
+    //	   waitee->ready.value);
+    //effect: only will wait for a tid once
+    sema_down(&waitee->ready);
   }
   
-  return -1;
+
+  struct thread *cur = thread_current();
+  sema_down(&cur->wait_sem);
+  res_status = waitee->status;
+  tid_remove( child_tid );
+  //free(waitee);
+
+  //printf("process wait for thread tid %d COMPLETE\n", cur->tid);
+  return res_status;
+
+  //sema_up(thread_current()->wait_sem);
+  //check thread's exit status from children list and free mem
+  
+  //return -1;
 }
 
 /* Free the current process's resources. */
@@ -112,7 +198,15 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-    printf("finished process\n");
+  // printf("finished process\n");
+
+  
+  if(cur->name_only != NULL) {
+    printf("%s: exit(%d)\n", cur->name_only, cur->exit_status);
+    //printf("NAME: exit(%d)\n", cur->exit_status);
+  }
+  
+  
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -130,6 +224,9 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  
+
 }
 
 /* Sets up the CPU for running user code in the current
@@ -231,13 +328,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+  
   char name[256];
   strlcpy(name, file_name, strlen(file_name) + 1);
   
 
   char *tok_ptr1;
   char *file_only = strtok_r(file_name, " ", &tok_ptr1);
-
+  
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -329,13 +427,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   //ADDED HERE
 
-
+  
   char *args[256];
   char *token,  *save_ptr;
   int count = 0;
 
   
-  printf("file name: %s\n", name);
+  // printf("file name: %s\n", name);
   //put all args into array
   for (token = strtok_r (name, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
@@ -343,7 +441,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
     count++;
     //printf("%s: count: %d\n", token, count);
   }
-    printf("start stack\n");
+  
+
+  //printf("start stack\n");
   /* Set up stack. */
   if (!setup_stack (esp, args))
     goto done;
@@ -355,7 +455,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file);
   return success;
 }
 
@@ -489,14 +589,15 @@ setup_stack (void **esp, char **argv)
     total_len += strlen(argv[count]);
     //for the space
     total_len += 1;
-    printf("string: %s count: %d totlen: %d\n", argv[count], count, total_len);
+    //printf("string: %s count: %d totlen: %d\n",
+	   //argv[count], count, total_len);
     count++;
     
   }
 
   //calc alignment
   align = 4 - (total_len % 4);
-  printf("align: %d\n", align);
+  //printf("align: %d\n", align);
   
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -526,7 +627,7 @@ setup_stack (void **esp, char **argv)
     }
     //add align
     for(i = 0; i < align; i++) {
-      *esp -= align;
+      *esp -= 1;
       memcpy(*esp, &temp, 1);
     }
     
@@ -565,7 +666,7 @@ setup_stack (void **esp, char **argv)
     memcpy(*esp, &temp, 4);
 
 
-  hex_dump(*esp, *esp, PHYS_BASE - *esp, 1);
+    //hex_dump(*esp, *esp, PHYS_BASE - *esp, 1);
   return success;
 }
 
