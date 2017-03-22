@@ -126,7 +126,7 @@ struct exit_status {
   struct thread *t;
   int tid;
   struct semaphore ready;
-  struct semaphore loaded;
+  bool load_success;
   int status;
   struct list_elem elem;
   

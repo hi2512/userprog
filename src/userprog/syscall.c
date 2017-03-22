@@ -48,9 +48,11 @@ int *arg(int *esp, int num) {
   int *res = NULL;
   int *t = esp;
   t += num;
+  
   if(!addr_valid(t)) {
     exit(-1);
   }
+  
   res = (int *) pagedir_get_page(thread_current()->pagedir, t);
   ASSERT (is_kernel_vaddr(res));
   return res;
@@ -62,7 +64,7 @@ static void
 syscall_handler (struct intr_frame *f) 
 {
 
-  // printf("START DDDDDDDDDDDDDDDDDDDDDDDDDDDDDd");
+   printf("START DDDDDDDDDDDDDDDDDDDDDDDDDDDDDd\n");
   int *a = f->esp;
 
   //do validity check
@@ -72,10 +74,10 @@ syscall_handler (struct intr_frame *f)
     exit(-1);
     
   } else {
-    //printf("valid address, esp: %x, points to %d\n", a, *a);
+    // printf("valid address, esp: %x, points to %d\n", a, *a);
   }
 
-  //printf("This thread is %s\n", thread_current()->name);
+  printf("This thread is %s\n", thread_current()->name);
 
   //switch depending on enums in syscall-nr.h
   switch(*a) {
@@ -110,10 +112,11 @@ syscall_handler (struct intr_frame *f)
       //printf("in feax: %d\n", f->eax);
       break;
     case SYS_WRITE :
-      //  printf("w fd: %x\n", *arg(a, 1));
+      // printf("w fd: %x\n", *arg(a, 1));
       //printf("w buf loc: %x\n", *arg(a, 2));
       // printf("w size: %x\n", *arg(a, 3));
       f->eax = write(*arg(a, 1), *arg(a, 2), *arg(a, 3));
+      printf("WRITE DONE\n");
       break;
     case SYS_SEEK :
       seek(*arg(a, 1), *arg(a, 2));
@@ -154,7 +157,29 @@ struct exit_status *get_es(struct thread *t) {
     e = list_next(e);
   }
 
+  return res;
 }
+
+struct exit_status *get_es_tid(tid_t tid) {
+
+  struct exit_status *res = NULL;
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->children);
+  while(e != list_end(&cur->children)) {
+    
+    struct exit_status *es = list_entry(e, struct exit_status, elem);
+    //printf("thread tid %d is checking es %d for thread tid %d\n", cur->tid, es->tid, tid);
+    if(es->tid == tid) {
+      //printf("GOTTTTTTTT\n");
+      res = es;
+      break;
+    }
+    e = list_next(e);
+  }
+
+  return res;
+}
+
 
 
 
@@ -197,10 +222,24 @@ void exit(int status) {
 
 tid_t exec(const char *cmd_line) {
 
-  //check for load to be finished????
-  tid_t res = process_execute(cmd_line);
+  if(!addr_valid(cmd_line) || !(is_mapped(cmd_line))) {
+    exit(-1);
+  }
 
+  //check for load to be finished????
+  sema_init(&thread_current()->exec_sem, 0);
+  tid_t res = process_execute(cmd_line);
   sema_down(&thread_current()->exec_sem);
+  struct exit_status *es = get_es_tid(res);
+  //printf("es GOT, es tid: %d, target tid: %d\n", es->tid, res);
+  if( es->load_success == 0 ) {
+    //printf("LOAD FAILED for tid %d\n", es->tid);
+    return -1;
+  }
+  //printf("es GOT tid: %d\n", res);
+  //sema_down(&es->ready);
+  //printf("exec sem val: %d\n", thread_current()->exec_sem.value);
+  //sema_down(&thread_current()->exec_sem);
   //printf("exec sem down\n");
   return res;
   
@@ -295,15 +334,37 @@ int filesize(int fd) {
   return res;
 }
 
+bool buf_valid(void *buf, unsigned size) {
+
+  bool res = true;
+  char *b = (char *) buf;
+  int limit = (int) size;
+  int i;
+  for(i = 0; i < limit; i++) {
+    printf("check at addr: %x\n", b);
+    if(!addr_valid(*b)) {
+      res = false;
+      break;
+    }
+    b += 1;
+  }
+  return res;
+}
+
 int read(int fd, void *buffer, unsigned size) {
 
-
+  /*
+   if(!buf_valid(buffer, size)) {
+    exit(-1);
+  }
+  */
 
   if( (fd < 0) || (fd == 1) ||  (fd > 129) ||
       (!addr_valid(buffer)) || !(is_mapped(buffer))  ) {
     exit(-1);
   }
-  
+
+ 
   lock_acquire(&file_lock);
   if(fd == 0) {
     int i;
@@ -335,6 +396,13 @@ int read(int fd, void *buffer, unsigned size) {
 
 
 int write(int fd, const void *buffer, unsigned size) {
+
+  //printf("start WRITE\n");
+  /*
+    if(!buf_valid(buffer, size)) {
+    exit(-1);
+  }
+  */
 
   if( (fd < 1) || (fd > 129) ||  (!addr_valid(buffer)) || !(is_mapped(buffer)) ) {
     exit(-1);

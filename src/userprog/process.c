@@ -44,23 +44,30 @@ process_execute (const char *file_name)
 
 
 
+
+
   /* Create a new thread to execute FILE_NAME. */
    tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
+  } else {
+
+
+    char *my_copy = palloc_get_page(0);
+    strlcpy (my_copy, file_name, PGSIZE);
+    char *tok_ptr1;
+    char *file_only = strtok_r(my_copy, " ", &tok_ptr1);
+
+  
+    //attach full cmd_line for exit print
+    struct exit_status *es = tid_to_child(tid);
+    strlcpy(es->t->name_only, file_only, 16);
+
   }
 
-  
-  char *my_copy = palloc_get_page(0);
-  strlcpy (my_copy, file_name, PGSIZE);
-  char *tok_ptr1;
-  char *file_only = strtok_r(my_copy, " ", &tok_ptr1);
 
   
-  //attach full cmd_line for exit print
-  struct exit_status *es = tid_to_child(tid);
-  strlcpy(es->t->name_only, file_only, 16);
-  
+
 
   return tid;
 }
@@ -82,20 +89,25 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+  struct thread *cur = thread_current();
+  cur->status_in_parent->load_success = success;
   //printf("finished load\n");
 
   // sema_up(&thread_current()->status_in_parent->ready);
   //finished thread load
-  //printf("finished thread is %s\n", thread_current()->name);
+  //printf("load success: %d\n", cur->status_in_parent->load_success);
+  //sema_up(&thread_current()->status_in_parent->loaded);
   
-  //sema_up(&thread_current()->exec_sem);
+  sema_up(&cur->parent->exec_sem);
   // printf("exec sem val: %d\n", thread_current()->exec_sem.value);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success) {
+    //printf("LOAD FAILED\n");
+    sema_up(&cur->status_in_parent->ready);
     thread_exit ();
-
+  }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -115,7 +127,7 @@ struct exit_status * tid_to_child(tid_t tid) {
   while(e != list_end(&cur->children)) {
     //check for valid pid
     struct exit_status *es = list_entry(e, struct exit_status, elem);
-    //printf("thread tid %d is checking es for thread tid %d\n", cur->tid, es->t->tid);
+    //printf("thread tid %d is checking es %d for thread tid %d\n", cur->tid, es->tid, tid);
     // sema_down(&es->ready);
     //printf("DONE  ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
     if(es->tid == tid) {
@@ -165,10 +177,10 @@ process_wait (tid_t child_tid)
 
   struct exit_status *waitee = tid_to_child(child_tid);
   if( (waitee == NULL) ) {
-    // printf("not a tid waiting on\n");
+    //printf("not a tid waiting on\n");
     return -1;
   } else {
-    // printf("es: %d retrieved, ready val: %d\n", waitee->tid,
+    //printf("es: %d retrieved, ready val: %d\n", waitee->tid,
     //	   waitee->ready.value);
     sema_down(&waitee->ready);
     //printf("es: %d %d READY,\n", waitee->t->tid, waitee->tid);
@@ -328,7 +340,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
-  
+  // printf("loading %s\n", file_name);
   char name[256];
   strlcpy(name, file_name, strlen(file_name) + 1);
   
@@ -455,7 +467,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  //file_close (file);
+  //printf("DONE WITH LOAD of %s success: %d\n", file_only, success);
+  file_close (file);
   return success;
 }
 
