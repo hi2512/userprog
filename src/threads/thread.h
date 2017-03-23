@@ -114,7 +114,8 @@ struct thread
     struct semaphore exec_sem;
 
     struct file *files[128];
-
+    //bool fd[128];
+    
     int exit_status;
 
     char name_only[16];

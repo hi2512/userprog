@@ -503,10 +503,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->parent = NULL;
   list_init(&t->children);
   sema_init(&t->exec_sem, 0);
+  
   int i;
   for(i = 0; i < 128; i++) {
     t->files[i] = NULL;
   }
+  
   t->exit_status = -1;
   
   

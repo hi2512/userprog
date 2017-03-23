@@ -11,6 +11,8 @@
 
 static void syscall_handler (struct intr_frame *);
 
+static struct file *files[128];
+
 static struct lock file_lock;
 
 
@@ -28,6 +30,11 @@ syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   lock_init(&file_lock);
+  int i;
+  for(i = 0; i < 128; i++) {
+    files[i] = NULL;
+  }
+
 }
 
 bool addr_valid(int *esp) {
@@ -64,11 +71,11 @@ static void
 syscall_handler (struct intr_frame *f) 
 {
 
-   printf("START DDDDDDDDDDDDDDDDDDDDDDDDDDDDDd\n");
+  //printf("START DDDDDDDDDDDDDDDDDDDDDDDDDDDDDd\n");
   int *a = f->esp;
 
   //do validity check
-  if( !(is_mapped(a) && addr_valid(a) )  ) {
+  if( !( addr_valid(a) && is_mapped(a) )  ) {
     //kill? exit?
     //printf("bad esp\n");
     exit(-1);
@@ -77,7 +84,7 @@ syscall_handler (struct intr_frame *f)
     // printf("valid address, esp: %x, points to %d\n", a, *a);
   }
 
-  printf("This thread is %s\n", thread_current()->name);
+  //printf("This thread is %s\n", thread_current()->name);
 
   //switch depending on enums in syscall-nr.h
   switch(*a) {
@@ -116,7 +123,8 @@ syscall_handler (struct intr_frame *f)
       //printf("w buf loc: %x\n", *arg(a, 2));
       // printf("w size: %x\n", *arg(a, 3));
       f->eax = write(*arg(a, 1), *arg(a, 2), *arg(a, 3));
-      printf("WRITE DONE\n");
+      //printf("total wrote: %d\n", f->eax);
+      //printf("WRITE DONE\n");
       break;
     case SYS_SEEK :
       seek(*arg(a, 1), *arg(a, 2));
@@ -295,6 +303,27 @@ int add_file(struct file *f) {
   return fd;
 }
 
+/*
+int add_file(struct file *f) {
+
+  int fd = -1;
+
+  struct thread *cur = thread_current();
+  int i;
+  //128 b/c file limit
+  for(i = 0; i < 128; i++) {
+    if(files[i] == NULL) {
+      //there is an open spot
+      files[i] = f;
+      //plus 2 to count for 0 and 1
+      fd = i + 2;
+      break;
+    }
+  }
+  return fd;
+}
+*/
+
 int open(const char *file) {
 
   /*
@@ -315,8 +344,12 @@ int open(const char *file) {
   }
   //printf("file was FOUND\n");
   int res = add_file(f);
+  //mark file as open in the thread
+  struct thread *cur = thread_current();
+  // cur->fd[res - 2] = true;
   lock_release(&file_lock);
-  // printf("fd is: %d\n", res);
+  //printf("OPEN: fd is: %d\n", res);
+  //printf("thread %s's fd - 2 val is %d\n", cur->name, cur->fd[res - 2]);
   return res;
 }
 
@@ -324,6 +357,7 @@ int filesize(int fd) {
 
   lock_acquire(&file_lock);
   struct file *f = thread_current()->files[(fd - 2)];
+  //struct file *f = files[(fd - 2)];
   if(f == NULL) {
     //no file here
     lock_release(&file_lock);
@@ -379,6 +413,7 @@ int read(int fd, void *buffer, unsigned size) {
     return size;
   }
   struct file *f = thread_current()->files[(fd - 2)];
+  // struct file *f = files[(fd - 2)];
   //printf("size: %d GOT FILEEEEEEEEEEEEEEEEEEEEEEEEEEe\n", size);
   //printf("read, fd is: %d\n", fd);
   if(f == NULL) {
@@ -393,6 +428,7 @@ int read(int fd, void *buffer, unsigned size) {
 
 
 }
+
 
 
 int write(int fd, const void *buffer, unsigned size) {
@@ -418,12 +454,22 @@ int write(int fd, const void *buffer, unsigned size) {
   }
   //else get file
   //fd - 1
-  struct file *write_loc = thread_current()->files[(fd - 2)];
+   struct file *write_loc = thread_current()->files[(fd - 2)];
+  //struct file *write_loc = files[(fd - 2)];
   if(write_loc == NULL) {
     //printf("NO FILE HERE\n");
     lock_release(&file_lock);
     return -1;
   } else {
+    //printf("WRITE: fd is %d\n", fd);
+    /*
+    if(thread_current()->files[(fd - 2)] != NULL) {
+      printf("WRITE FAILED: FILE OPEN IN THREAD\n");
+      lock_release(&file_lock);
+      return 0;
+    }
+    */
+    //printf("WRITE TO FILE\n");
     int res = file_write(write_loc, buffer, size);
     lock_release(&file_lock);
     return res;
@@ -436,6 +482,7 @@ void seek(int fd, unsigned position) {
 
   lock_acquire(&file_lock);
   file_seek(thread_current()->files[(fd - 2)], position);
+  //file_seek(files[(fd - 2)], position);
   lock_release(&file_lock);
 }
 
@@ -443,6 +490,7 @@ unsigned tell(int fd) {
 
   lock_acquire(&file_lock);
   unsigned res = (unsigned) file_tell(thread_current()->files[(fd - 2)]);
+  //unsigned res = (unsigned) file_tell(files[(fd - 2)]);
   lock_release(&file_lock);
   return res;
   
@@ -458,9 +506,13 @@ void close(int fd) {
   lock_acquire(&file_lock);
   struct thread *cur = thread_current();
   struct file *f = cur->files[(fd - 2)];
-  if(f != NULL) {
+  //struct file *f = files[(fd - 2)];
+  //if( (f != NULL) && (cur->fd[fd - 2]) ) {
+  if( (f != NULL) ) {
     file_close(f);
     cur->files[fd - 2] = NULL;
+    //files[fd - 2] = NULL;
+    //cur->fd[fd - 2] = false;
   }
   lock_release(&file_lock);
 }
