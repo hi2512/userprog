@@ -119,6 +119,8 @@ struct thread
     int exit_status;
 
     char name_only[16];
+
+    struct file *my_file;
     
   };
 

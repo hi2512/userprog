@@ -30,7 +30,7 @@ struct exit_status * tid_to_child(tid_t tid);
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute (const char *file_name) 
+process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
@@ -214,10 +214,9 @@ process_exit (void)
   //printf("exiting tid: %d\n", cur->tid);
   
   if(cur->name_only != NULL) {
-    printf("%s: exit(%d)\n", cur->name_only, cur->exit_status);
-    //printf("NAME: exit(%d)\n", cur->exit_status);
+     printf("%s: exit(%d)\n", cur->name_only, cur->exit_status);
   }
-  
+  file_close(cur->my_file);
   
 
   /* Destroy the current process's page directory and switch back
@@ -362,6 +361,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+  //ADD HERE
+  file_deny_write(file);
+  t->my_file = file;
+  
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

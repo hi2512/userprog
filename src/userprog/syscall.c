@@ -151,23 +151,6 @@ void halt() {
 
 }
 
-struct exit_status *get_es(struct thread *t) {
-
-  struct exit_status *res = NULL;
-  struct thread *par = thread_current()->parent;
-  struct list_elem *e = list_begin(&par->children);
-  while(e != list_end(&par->children)) {
-    struct exit_status *es = list_entry(e, struct exit_status, elem);
-    if(es->tid == t->tid) {
-      res = es;
-      break;
-    }
-    e = list_next(e);
-  }
-
-  return res;
-}
-
 struct exit_status *get_es_tid(tid_t tid) {
 
   struct exit_status *res = NULL;
@@ -176,9 +159,7 @@ struct exit_status *get_es_tid(tid_t tid) {
   while(e != list_end(&cur->children)) {
     
     struct exit_status *es = list_entry(e, struct exit_status, elem);
-    //printf("thread tid %d is checking es %d for thread tid %d\n", cur->tid, es->tid, tid);
     if(es->tid == tid) {
-      //printf("GOTTTTTTTT\n");
       res = es;
       break;
     }
@@ -207,7 +188,7 @@ void exit(int status) {
     //printf("par is %s, es ready val: %d\n", cur->parent->name, es->ready.value);
     //printf("es tid is: %d\n", es->tid);
   } else {
-     printf("has no parent???\n");
+    //printf("has no parent???\n");
   }
   /*
   
@@ -244,11 +225,6 @@ tid_t exec(const char *cmd_line) {
     //printf("LOAD FAILED for tid %d\n", es->tid);
     return -1;
   }
-  //printf("es GOT tid: %d\n", res);
-  //sema_down(&es->ready);
-  //printf("exec sem val: %d\n", thread_current()->exec_sem.value);
-  //sema_down(&thread_current()->exec_sem);
-  //printf("exec sem down\n");
   return res;
   
 }
@@ -303,26 +279,6 @@ int add_file(struct file *f) {
   return fd;
 }
 
-/*
-int add_file(struct file *f) {
-
-  int fd = -1;
-
-  struct thread *cur = thread_current();
-  int i;
-  //128 b/c file limit
-  for(i = 0; i < 128; i++) {
-    if(files[i] == NULL) {
-      //there is an open spot
-      files[i] = f;
-      //plus 2 to count for 0 and 1
-      fd = i + 2;
-      break;
-    }
-  }
-  return fd;
-}
-*/
 
 int open(const char *file) {
 
