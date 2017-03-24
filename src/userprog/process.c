@@ -24,7 +24,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 struct exit_status * tid_to_child(tid_t tid);
 
 
-
+//Ramon driving
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -43,30 +43,12 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
 
-
-
-
   /* Create a new thread to execute FILE_NAME. */
    tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
-  } else {
+  } 
 
-
-    char *my_copy = palloc_get_page(0);
-    strlcpy (my_copy, file_name, PGSIZE);
-    char *tok_ptr1;
-    char *file_only = strtok_r(my_copy, " ", &tok_ptr1);
-
-  
-    //attach full cmd_line for exit print
-    struct exit_status *es = tid_to_child(tid);
-    strlcpy(es->t->name_only, file_only, 16);
-
-  }
-
-
-  
 
 
   return tid;
@@ -93,19 +75,12 @@ start_process (void *file_name_)
   cur->status_in_parent->load_success = success;
   //printf("finished load\n");
 
-  // sema_up(&thread_current()->status_in_parent->ready);
-  //finished thread load
-  //printf("load success: %d\n", cur->status_in_parent->load_success);
-  //sema_up(&thread_current()->status_in_parent->loaded);
-  
+  //process finished loading and mark in parent
   sema_up(&cur->parent->exec_sem);
-  // printf("exec sem val: %d\n", thread_current()->exec_sem.value);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
-    //printf("LOAD FAILED\n");
-    sema_up(&cur->status_in_parent->ready);
     thread_exit ();
   }
   /* Start the user process by simulating a return from an
@@ -118,7 +93,7 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
-
+//function to get exit status from tid
 struct exit_status * tid_to_child(tid_t tid) {
 
   struct thread *result = NULL;
@@ -127,9 +102,6 @@ struct exit_status * tid_to_child(tid_t tid) {
   while(e != list_end(&cur->children)) {
     //check for valid pid
     struct exit_status *es = list_entry(e, struct exit_status, elem);
-    //printf("thread tid %d is checking es %d for thread tid %d\n", cur->tid, es->tid, tid);
-    // sema_down(&es->ready);
-    //printf("DONE  ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
     if(es->tid == tid) {
       result = es;
       break;
@@ -140,6 +112,7 @@ struct exit_status * tid_to_child(tid_t tid) {
 
 }
 
+//removes tid from child list
 void tid_remove(tid_t tid) {
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->children);
@@ -155,7 +128,7 @@ void tid_remove(tid_t tid) {
   }
 }
 
-
+//Eric driving
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -169,38 +142,26 @@ int
 process_wait (tid_t child_tid) 
 {
 
-  //printf("process wait by %d called with: %d\n",
-  //	 thread_current()->tid, child_tid);
-  
   
   int res_status;
 
   struct exit_status *waitee = tid_to_child(child_tid);
   if( (waitee == NULL) ) {
-    //printf("not a tid waiting on\n");
+    //this was not a tid waiting on
     return -1;
   } else {
-    //printf("es: %d retrieved, ready val: %d\n", waitee->tid,
-    //	   waitee->ready.value);
+    //wait until the thread was killed and sema was posted
     sema_down(&waitee->ready);
-    //printf("es: %d %d READY,\n", waitee->t->tid, waitee->tid);
   }
   
 
   struct thread *cur = thread_current();
-  //sema_down(&cur->wait_sem);
   res_status = waitee->status;
+  //remove it from the list
   tid_remove( child_tid );
-  //free(waitee);
 
-  //printf("process wait for thread tid %d waiting on %d COMPLETE\n",
-  //	 cur->tid, child_tid);
   return res_status;
 
-  //sema_up(thread_current()->wait_sem);
-  //check thread's exit status from children list and free mem
-  
-  //return -1;
 }
 
 /* Free the current process's resources. */
@@ -210,13 +171,15 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  // printf("finished process\n");
-  //printf("exiting tid: %d\n", cur->tid);
-  
-  if(cur->name_only != NULL) {
-     printf("%s: exit(%d)\n", cur->name_only, cur->exit_status);
-  }
+  //close all files
   file_close(cur->my_file);
+  int i;
+  for(i = 0; i < 128; i++) {
+    struct file *f = cur->files[i];
+    if(f != NULL) {
+      file_close(f);
+    }
+  }
   
 
   /* Destroy the current process's page directory and switch back
@@ -339,8 +302,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
-  // printf("loading %s\n", file_name);
-  char name[256];
+  
+  char *name = palloc_get_page(0);
+  if(name == NULL) {
+    return TID_ERROR;
+  }
   strlcpy(name, file_name, strlen(file_name) + 1);
   
 
@@ -364,6 +330,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   //ADD HERE
   file_deny_write(file);
   t->my_file = file;
+
+  //copy name for exit
+  strlcpy(t->name_only, file_only, 16);
   
 
   /* Read and verify executable header. */
@@ -447,18 +416,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char *token,  *save_ptr;
   int count = 0;
 
-  
-  // printf("file name: %s\n", name);
   //put all args into array
   for (token = strtok_r (name, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
     args[count] = token;
     count++;
-    //printf("%s: count: %d\n", token, count);
+
   }
   
 
-  //printf("start stack\n");
   /* Set up stack. */
   if (!setup_stack (esp, args))
     goto done;
@@ -583,6 +549,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+//Eric driving
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
@@ -591,29 +558,24 @@ setup_stack (void **esp, char **argv)
   uint8_t *kpage;
   bool success = false;
 
-   //add
+   //add here
  
-
   int total_len = 0;
   int align;
-
+  int ps = sizeof(int *);
+  //size of the pointer
   
   //get total number of bytes with spaces to calc alignment
   int count = 0;
   while(argv[count] != NULL) {
-
     total_len += strlen(argv[count]);
     //for the space
     total_len += 1;
-    //printf("string: %s count: %d totlen: %d\n",
-	   //argv[count], count, total_len);
-    count++;
-    
+    count++;  
   }
 
   //calc alignment
-  align = 4 - (total_len % 4);
-  //printf("align: %d\n", align);
+  align = ps - (total_len % ps);
   
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -628,10 +590,7 @@ setup_stack (void **esp, char **argv)
       }
     }
 
-
-
-  
-	  //add args
+    //add args
     int i;
     int temp = 0;
     int cur_len;
@@ -649,37 +608,35 @@ setup_stack (void **esp, char **argv)
     
     //add end of argv
     
-    *esp -= 4;
-    memcpy(*esp, &temp, 4);
+    *esp -= ps;
+    memcpy(*esp, &temp, ps);
     
     //fill in argv
     int location;
     for(i = count - 1; i >= 0; i--) {
-      //printf("do loop argv count: %d\n", i);
-      //4 for endargv + align + total length minus part trying to get
+      //loc for pointer + endargv + align + total length
+      //minus part trying to get
       cur_len =  strlen(argv[i]) + 1;
-      //printf("current len: %d\n", cur_len);
-      location =  *esp + 4 + align + (total_len - cur_len);
-      // printf("loc: %x\n", location);
-      *esp -= 4;
-      memcpy(*esp, &location, 4);
-      //sub from total_len for next iteration and minus 4 to account for move, NO LONGER TOTAL
-      total_len -= cur_len - 4;
+      location =  *esp + ps + align + (total_len - cur_len);
+      *esp -= ps;
+      memcpy(*esp, &location, ps);
+      //sub from total_len for next iteration and minus 4 to account for move,
+      //NO LONGER TOTAL
+      total_len -= cur_len - ps;
     }
     
     //add argv pointer
     int loc = *esp;
-    //printf("loc: %x\n", loc);
-    *esp -= 4;
-    memcpy(*esp, &loc, 4);
+    *esp -= ps;
+    memcpy(*esp, &loc, ps);
 
     //add argc
-    *esp -= 4;
-    memcpy(*esp, &count, 4);
+    *esp -= ps;
+    memcpy(*esp, &count, ps);
 
     //blank return
-    *esp -= 4;
-    memcpy(*esp, &temp, 4);
+    *esp -= ps;
+    memcpy(*esp, &temp, ps);
 
 
     //hex_dump(*esp, *esp, PHYS_BASE - *esp, 1);

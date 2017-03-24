@@ -162,9 +162,9 @@ page_fault (struct intr_frame *f)
   printf("There is no crying in Pintos!\n");
   */
   if(user) {
-    //printf("this thread is %s\n", thread_current()->name);
     sema_up(&thread_current()->status_in_parent->ready);
-    thread_exit();
+    exit(-1);
+    //thread_exit();
     return;
   }
   

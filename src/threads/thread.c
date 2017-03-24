@@ -202,16 +202,12 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 
   //ADD userprog
+  //establish parent and struct to hold the status
   struct thread *cur = thread_current();
   t->parent = cur;
   sema_init(&t->exec_sem, 0);
-  //printf("parent assigned: %s\n", cur->name);
-  //printf("par tid: %d my tid: %d my name %s\n", cur->tid, t->tid, name);
   struct exit_status *es = malloc(sizeof(struct exit_status));
   sema_init(&es->ready, 0);
-  //es->load_success =  false;
-  //sema_init(&es->loaded, 0);
-  //printf("es INITED for %s\n", name);
   es->t = t;
   es->tid = tid;
   es->status = -1;
@@ -219,13 +215,7 @@ thread_create (const char *name, int priority,
 
   t->status_in_parent = es;
 
-  //t->name_only = NULL;
 
-  // printf("ready val: %d\n", &es->ready.value);
-  // printf("READY SETTTTTTTTTTTTTTTT for tid %d\n", tid);
-
-  //sema_up(&cur->exec_sem);
-  //printf("exec_sem posted\n");
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -499,10 +489,11 @@ init_thread (struct thread *t, const char *name, int priority)
   intr_set_level(old_level);
 
   //add for userprog
-  sema_init(&t->wait_sem, 0);
+  //initialize for thread create
   t->parent = NULL;
   list_init(&t->children);
   sema_init(&t->exec_sem, 0);
+
   
   int i;
   for(i = 0; i < 128; i++) {

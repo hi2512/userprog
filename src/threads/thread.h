@@ -105,29 +105,34 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
 
     //add for userprog
-    struct semaphore wait_sem;
     struct thread *parent;
     struct list children;
 
+    //for quick access of status
     struct exit_status *status_in_parent;
 
     struct semaphore exec_sem;
 
+    //all open files in a thread
+    //128 limit from slides
     struct file *files[128];
-    //bool fd[128];
     
     int exit_status;
 
+    //to hold proper name to exit with
     char name_only[16];
 
     struct file *my_file;
     
   };
 
+//used to hold the exit status of a thread
 struct exit_status {
 
   struct thread *t;
   int tid;
+  //to use when a thread has exited
+  //and status is ready to pick up
   struct semaphore ready;
   bool load_success;
   int status;
