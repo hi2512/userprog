@@ -12,6 +12,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "vm/page.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "threads/malloc.h"
@@ -215,6 +216,7 @@ thread_create (const char *name, int priority,
 
   t->status_in_parent = es;
 
+  init_spt(t);
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -466,6 +468,8 @@ is_thread (struct thread *t)
   return t != NULL && t->magic == THREAD_MAGIC;
 }
 
+
+
 /* Does basic initialization of T as a blocked thread named
    NAME. */
 static void
@@ -499,6 +503,10 @@ init_thread (struct thread *t, const char *name, int priority)
   for(i = 0; i < 128; i++) {
     t->files[i] = NULL;
   }
+
+  //add for vm
+  lock_init(&t->spt_lock);
+
   
   t->exit_status = -1;
   

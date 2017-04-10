@@ -4,6 +4,7 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "vm/page.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -108,6 +109,12 @@ kill (struct intr_frame *f)
     }
 }
 
+bool stack_fault(uint8_t * esp, uint8_t * fault_addr) {
+  //printf("comparing esp: %p to fault addr: %p\n", esp , fault_addr);
+  return (fault_addr == (esp - 32)) || (fault_addr == (esp - 4))
+    || (fault_addr >= esp);
+}
+
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
@@ -158,16 +165,54 @@ page_fault (struct intr_frame *f)
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
-
-  printf("There is no crying in Pintos!\n");
   */
+  // printf("There is no crying in Pintos!\n");
+  
+  /*
   if(user) {
     sema_up(&thread_current()->status_in_parent->ready);
     exit(-1);
     //thread_exit();
     return;
   }
+  */
+  //printf("Check present\n");
+
   
-  kill (f);
+  if(not_present) {
+    //printf("check user\n");
+    if(user) {
+      //printf("GOing into load page!!\n");
+      if(!load_page(fault_addr ) ) {
+	//kill(f);
+	//CHECK FOR A STACK EXPANSION?
+	if(stack_fault(f->esp, fault_addr)) {
+	  //printf("SSSSSSSSSSTACK FAULT????\n");
+	  if(load_stack(fault_addr)) {
+	    return;
+	  } else {
+	    kill(f);
+	  }
+	} else {
+	  // printf("NOT A STACK FAULT OR PAGE\n");
+	  //kill(f);
+	   exit(-1);
+	}
+
+      } else {
+	//success??
+	
+	return;
+      }
+    } 
+  } else {
+    //kernel?
+    exit(-1);
+    
+  }
+
+  
+
+  //kill (f);
 }
 

@@ -18,6 +18,12 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#include "threads/loader.h"
+#include "vm/page.h"
+#include "vm/frame.h"
+#include "threads/synch.h"
+
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -45,9 +51,9 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
    tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR) {
+   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
-  } 
+   } 
 
 
 
@@ -141,7 +147,6 @@ void tid_remove(tid_t tid) {
 int
 process_wait (tid_t child_tid) 
 {
-
   
   int res_status;
 
@@ -159,10 +164,12 @@ process_wait (tid_t child_tid)
   res_status = waitee->status;
   //remove it from the list
   tid_remove( child_tid );
+  free(waitee);
 
   return res_status;
 
 }
+
 
 /* Free the current process's resources. */
 void
@@ -172,6 +179,7 @@ process_exit (void)
   uint32_t *pd;
 
   //close all files
+  
   file_close(cur->my_file);
   int i;
   for(i = 0; i < 128; i++) {
@@ -302,7 +310,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
-  
+  //printf("CMD LINE: %s\n", file_name);
   char *name = palloc_get_page(0);
   if(name == NULL) {
     return TID_ERROR;
@@ -423,7 +431,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
     count++;
 
   }
-  
+  if(count >= 256) {
+    exit(-1);
+  }
 
   /* Set up stack. */
   if (!setup_stack (esp, args))
@@ -512,7 +522,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
+  //printf("LOAD SEGMENT CALLED\n");
+
+  //palloc_get_page(PAL_USER);
+
+   file_seek (file, ofs);
+  off_t cur_off = ofs;
+  //printf("file size is %d\n", file_length(file));
+  
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -521,30 +538,33 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
-        return false;
+      /*
+	TEST HERE
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+       */
+      
+      //printf("init ram pages: %d\n", init_ram_pages);
+      //printf("page read bytes: %d, offset: %d\n",
+      //	     (int) page_read_bytes, cur_off);
+      //printf("page zero bytes: %d\n", (int) page_zero_bytes);
+      //printf("tot: %d\n", (int) (page_read_bytes + page_zero_bytes));
+      //printf("offset is: %d\n", cur_off);
 
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
+      //printf("FIle pos is %d \n", file_tell(file));
+           
+      
+      struct spage *sp = new_spage(file, cur_off, upage,
+		         page_read_bytes, page_zero_bytes, writable);
+
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+
+
+      cur_off += page_read_bytes;
+      //printf("OFF AFTER ADDING %d\n", cur_off);
     }
   return true;
 }
@@ -555,11 +575,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp, char **argv) 
 {
-  uint8_t *kpage;
+  // uint8_t *kpage;
   bool success = false;
 
-   //add here
- 
+  //add here
+  
   int total_len = 0;
   int align;
   int ps = sizeof(int *);
@@ -576,7 +596,7 @@ setup_stack (void **esp, char **argv)
 
   //calc alignment
   align = ps - (total_len % ps);
-  
+  /*
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
@@ -589,6 +609,19 @@ setup_stack (void **esp, char **argv)
         palloc_free_page (kpage);
       }
     }
+  */
+  //  printf("THIS IS THE STACK PAGE\n");
+  struct spage *st = new_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - PGSIZE,
+			       0, 0, true);
+
+  success = load_page(st->uaddr);
+  if(success) {
+    *esp = PHYS_BASE;
+  } else {
+    palloc_free_page(st->f->kaddr);
+  }
+  
+  //load_stack(((uint8_t *) PHYS_BASE) - PGSIZE, *esp);
 
     //add args
     int i;

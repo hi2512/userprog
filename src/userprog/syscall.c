@@ -23,6 +23,7 @@ unsigned tell(int fd);
 void close(int fd);
 
 bool is_mapped(int *esp);
+bool buf_map(void * buf, int size);
 
 void
 syscall_init (void) 
@@ -42,19 +43,45 @@ bool is_mapped(int *esp) {
   return ( e != NULL );
 }
 
+/*
+bool buf_map(void * buf, int size) {
+
+  printf("BUFMAP CALLED for size %d\n", size);
+  uint8_t *l_buf = (uint8_t *) buf;
+  int i;
+  for(i = 0; i < size; i++) {
+    //printf("%d: CHECKING ADDR: %x\n", i, l_buf);
+    if(!is_mapped(l_buf)) {
+      printf("not mapped FOUND\n");
+      return false;
+    }
+    l_buf++;
+  }
+  //printf("returning true\n");
+  return true;
+}
+*/
+
 //function to read user addresses
 int *arg(int *esp, int num) {
 
+  // printf("user addr: %p\n", (void *)  esp);
+  
   int *res = NULL;
   int *t = esp;
   t += num;
+  // printf("user addr after add: %x of %d\n", (void *)  t, num);
   
   if(!addr_valid(t)) {
     exit(-1);
   }
+
   //checks the page directory to get a valid address
   res = (int *) pagedir_get_page(thread_current()->pagedir, t);
   ASSERT (is_kernel_vaddr(res));
+
+  //printf("krnl addr: %x\n", (void *)  res);
+  
   return res;
   
 }
@@ -66,12 +93,14 @@ syscall_handler (struct intr_frame *f)
 
   int *a = f->esp;
 
+
   //do validity check
   if( !( addr_valid(a) && is_mapped(a) )  ) {
     //kill b/c bad pointer
     exit(-1);
     
   }
+
   
   //switch depending on enums in syscall-nr.h
   switch(*a) {
@@ -152,7 +181,10 @@ void exit(int status) {
 
 
   struct thread *cur = thread_current();
+
+  
   printf("%s: exit(%d)\n", cur->name_only, status);
+  
   if(cur->parent != NULL) {
     struct exit_status *es = cur->status_in_parent;
     es->status = status;
@@ -164,12 +196,13 @@ void exit(int status) {
   thread_exit();
 }
 
+
 tid_t exec(const char *cmd_line) {
 
-  if(!addr_valid(cmd_line) || !(is_mapped(cmd_line))) {
+  if(!addr_valid(cmd_line) || !(is_mapped(cmd_line)) ) {
     exit(-1);
   }
-
+  lock_acquire(&file_lock);
   //check for load to be finished????
   sema_init(&thread_current()->exec_sem, 0);
   tid_t res = process_execute(cmd_line);
@@ -178,8 +211,10 @@ tid_t exec(const char *cmd_line) {
   struct exit_status *es = get_es_tid(res);
   if( es->load_success == 0 ) {
     //load failed
+    lock_release(&file_lock);
     return -1;
   }
+  lock_release(&file_lock);
   return res;
   
 }
@@ -273,9 +308,13 @@ int filesize(int fd) {
 int read(int fd, void *buffer, unsigned size) {
 
   //check for valid fd and buffer
-  if( (fd < 0) || (fd == 1) ||  (fd > 129) ||
-      (!addr_valid(buffer)) || !(is_mapped(buffer))  ) {
+  // printf("addr valid: %d\n", addr_valid(buffer));
+  //printf("is mapped %d\n", is_mapped(buffer));
+  //printf("buf_map: %d\n", buf_map(buffer, (int) size));
+  if( (fd < 0) || (fd == 1) ||  (fd > 129) ||  (!addr_valid(buffer))  
+      ||  (!is_mapped(buffer)) ) {
     exit(-1);
+
   }
 
  
@@ -297,6 +336,7 @@ int read(int fd, void *buffer, unsigned size) {
     lock_release(&file_lock);
     return -1;
   } else {
+    //printf("entering file read\n");
     off_t res = file_read(f, buffer, (off_t) size);
     lock_release(&file_lock);
     return (int) res;
@@ -311,7 +351,7 @@ int write(int fd, const void *buffer, unsigned size) {
 
 
   if( (fd < 1) || (fd > 129) ||  (!addr_valid(buffer)) ||
-      !(is_mapped(buffer)) ) {
+      !(is_mapped(buffer))  ) {
     exit(-1);
   }
 

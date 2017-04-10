@@ -22,6 +22,7 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
+#include "vm/frame.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -37,6 +38,7 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+
 
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
@@ -98,6 +100,10 @@ main (void)
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
+
+  //ADD FOR VM
+  frametable_init(user_page_limit);
+  
 
   /* Segmentation. */
 #ifdef USERPROG

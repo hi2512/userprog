@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "vm/page.h"
+#include <hash.h>
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -99,12 +101,8 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-#endif
 
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
-
-    //add for userprog
+        //add for userprog
     struct thread *parent;
     struct list children;
 
@@ -123,6 +121,18 @@ struct thread
     char name_only[16];
 
     struct file *my_file;
+#endif
+
+
+    struct hash spt;
+    struct lock spt_lock;
+
+    
+
+    /* Owned by thread.c. */
+    unsigned magic;                     /* Detects stack overflow. */
+
+
     
   };
 
@@ -130,6 +140,7 @@ struct thread
 struct exit_status {
 
   struct thread *t;
+  //REMOVE ABOVE
   int tid;
   //to use when a thread has exited
   //and status is ready to pick up
