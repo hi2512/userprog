@@ -8,6 +8,8 @@
 #include "threads/synch.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/malloc.h"
+#include "vm/page.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -37,30 +39,58 @@ bool addr_valid(int *esp) {
   return (esp != NULL)  &&  (is_user_vaddr(esp)) ;
 }
 
+
+//HERE
+
+
+
+
+
+
+
+//TRY TO LOAD PAGE IF NOT MAPPED???????????
+
+
 bool is_mapped(int *esp) {
   
   int *e = (int *) pagedir_get_page(thread_current()->pagedir, esp);
+  
   return ( e != NULL );
 }
 
-/*
+bool stack_fault_sys(uint8_t * esp, uint8_t * fault_addr) {
+  //printf("SYS comparing esp: %p to fault addr: %p\n", esp , fault_addr);
+  //printf("esp is user: %d, fault_addr is user: %d\n",
+  // is_user_vaddr(esp), is_user_vaddr(fault_addr));
+  return (fault_addr == (esp - 32)) || (fault_addr == (esp - 4))
+    || (fault_addr >= esp);
+}
+
 bool buf_map(void * buf, int size) {
 
-  printf("BUFMAP CALLED for size %d\n", size);
+  //printf("BUFMAP CALLED for size %d\n", size);
+  struct thread *cur = thread_current();
   uint8_t *l_buf = (uint8_t *) buf;
   int i;
   for(i = 0; i < size; i++) {
-    //printf("%d: CHECKING ADDR: %x\n", i, l_buf);
+    if(!addr_valid(buf + i)) {
+      exit(-1);
+    }
+     //printf("%d: CHECKING ADDR: %x\n", i, l_buf);
     if(!is_mapped(l_buf)) {
-      printf("not mapped FOUND\n");
-      return false;
+      //printf("not mapped FOUND\n");
+       if(stack_fault_sys(cur->s_esp, l_buf)) {
+	 load_stack(buf + i);
+       }
+      load_page(buf + i);
+      //return false;
     }
     l_buf++;
   }
   //printf("returning true\n");
   return true;
 }
-*/
+
 
 //function to read user addresses
 int *arg(int *esp, int num) {
@@ -101,6 +131,8 @@ syscall_handler (struct intr_frame *f)
     
   }
 
+  thread_current()->s_esp = a;
+
   
   //switch depending on enums in syscall-nr.h
   switch(*a) {
@@ -129,6 +161,8 @@ syscall_handler (struct intr_frame *f)
       f->eax = filesize(*arg(a, 1));
       break;
     case SYS_READ :
+      // printf("buffer IS: %p\n", *arg(a,2));
+      buf_map(*arg(a, 2), (int) *arg(a, 3));
       f->eax = read(*arg(a, 1), *arg(a, 2), *arg(a, 3));
       break;
     case SYS_WRITE :
@@ -304,6 +338,17 @@ int filesize(int fd) {
   return res;
 }
 
+/* Writes BYTE to user address UDST.
+   UDST must be below PHYS_BASE.
+   Returns true if successful, false if a segfault occurred. */
+static bool 
+put_user (uint8_t *udst, uint8_t byte)
+{
+  int error_code;
+  asm ("movl $1f, %0; movb %b2, %1; 1:"
+       : "=&a" (error_code), "=m" (*udst) : "r" (byte));
+  return error_code != -1;
+}
 
 int read(int fd, void *buffer, unsigned size) {
 
@@ -311,8 +356,9 @@ int read(int fd, void *buffer, unsigned size) {
   // printf("addr valid: %d\n", addr_valid(buffer));
   //printf("is mapped %d\n", is_mapped(buffer));
   //printf("buf_map: %d\n", buf_map(buffer, (int) size));
-  if( (fd < 0) || (fd == 1) ||  (fd > 129) ||  (!addr_valid(buffer))  
-      ||  (!is_mapped(buffer)) ) {
+  // if( (fd < 0) || (fd == 1) ||  (fd > 129) ||  (!addr_valid(buffer))  
+  //    ||  (!is_mapped(buffer)) ) {
+  if( (fd < 0) || (fd == 1) ||  (fd > 129) ) {
     exit(-1);
 
   }
@@ -337,7 +383,19 @@ int read(int fd, void *buffer, unsigned size) {
     return -1;
   } else {
     //printf("entering file read\n");
+    //uint8_t *fu = malloc(size);
     off_t res = file_read(f, buffer, (off_t) size);
+    //off_t res = file_read(f, fu, (off_t) size);
+    //printf("done file");
+    /*
+    int i;
+    int s = (int) size;
+    for(i = 0; i < s; i++) {
+      printf("i:%d buffer + i: %p\n",i, buffer + i);
+      put_user(buffer + i, *(fu + i));
+    }
+    free(fu);
+    */
     lock_release(&file_lock);
     return (int) res;
   }

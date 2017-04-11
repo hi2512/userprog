@@ -127,6 +127,9 @@ struct thread
     struct hash spt;
     struct lock spt_lock;
 
+    //saved esp for page fault sys calls
+    uint8_t *s_esp;
+
     
 
     /* Owned by thread.c. */

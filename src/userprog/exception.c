@@ -5,6 +5,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "vm/page.h"
+#include "threads/vaddr.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -111,8 +112,20 @@ kill (struct intr_frame *f)
 
 bool stack_fault(uint8_t * esp, uint8_t * fault_addr) {
   //printf("comparing esp: %p to fault addr: %p\n", esp , fault_addr);
+  //printf("esp is user: %d, fault_addr is user: %d\n",
+  //	 is_user_vaddr(esp), is_user_vaddr(fault_addr));
   return (fault_addr == (esp - 32)) || (fault_addr == (esp - 4))
     || (fault_addr >= esp);
+}
+
+void load_st(uint8_t *addr, struct intr_frame *f) {
+
+  //printf("LOAD STACK CALLED with %p\n",  addr);
+  if(load_stack(addr)) {
+     return;
+  } else {
+     kill(f);
+  }
 }
 
 /* Page fault handler.  This is a skeleton that must be filled in
@@ -188,11 +201,14 @@ page_fault (struct intr_frame *f)
 	//CHECK FOR A STACK EXPANSION?
 	if(stack_fault(f->esp, fault_addr)) {
 	  //printf("SSSSSSSSSSTACK FAULT????\n");
+	  /*
 	  if(load_stack(fault_addr)) {
 	    return;
 	  } else {
 	    kill(f);
 	  }
+	  */
+	  load_st(fault_addr, f);
 	} else {
 	  // printf("NOT A STACK FAULT OR PAGE\n");
 	  //kill(f);
@@ -204,7 +220,17 @@ page_fault (struct intr_frame *f)
 	
 	return;
       }
-    } 
+    } else {
+      ///kernel??
+      struct thread *cur = thread_current();
+      //printf("IS STACK FAULT?: %d\n", stack_fault(cur->s_esp, fault_addr));
+      if(stack_fault(cur->s_esp, fault_addr)) {
+	load_st(cur->s_esp, f);
+      }
+       if(!load_page(fault_addr ) ) {
+	 exit(-1);
+       }
+    }
   } else {
     //kernel?
     exit(-1);
