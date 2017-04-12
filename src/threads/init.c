@@ -135,6 +135,9 @@ main (void)
   filesys_init (format_filesys);
 #endif
 
+  //put it at the end?
+  swap_init();
+  
   printf ("Boot complete.\n");
   
   /* Run actions specified on kernel command line. */
