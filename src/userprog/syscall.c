@@ -47,7 +47,6 @@ bool addr_valid(int *esp) {
 
 
 
-
 //TRY TO LOAD PAGE IF NOT MAPPED???????????
 
 
@@ -82,9 +81,10 @@ bool buf_map(void * buf, int size) {
        if(stack_fault_sys(cur->s_esp, l_buf)) {
 	 load_stack(buf + i);
        }
-      load_page(buf + i);
+       //printf("LOAD PAGE FROM BUF MAPNNNNNNNNNNNNN/n");
+       load_page(buf + i);
       //return false;
-    }
+      }
     l_buf++;
   }
   //printf("returning true\n");
@@ -161,11 +161,12 @@ syscall_handler (struct intr_frame *f)
       f->eax = filesize(*arg(a, 1));
       break;
     case SYS_READ :
-      // printf("buffer IS: %p\n", *arg(a,2));
+      // printf("buffer IS: %x\n", *arg(a,2));
       buf_map(*arg(a, 2), (int) *arg(a, 3));
       f->eax = read(*arg(a, 1), *arg(a, 2), *arg(a, 3));
       break;
     case SYS_WRITE :
+      buf_map(*arg(a, 2), (int) *arg(a, 3));
       f->eax = write(*arg(a, 1), *arg(a, 2), *arg(a, 3));
       break;
     case SYS_SEEK :
@@ -216,8 +217,9 @@ void exit(int status) {
 
   struct thread *cur = thread_current();
 
-  
+
   printf("%s: exit(%d)\n", cur->name_only, status);
+  ASSERT (1 == 0)
   
   if(cur->parent != NULL) {
     struct exit_status *es = cur->status_in_parent;
@@ -338,17 +340,7 @@ int filesize(int fd) {
   return res;
 }
 
-/* Writes BYTE to user address UDST.
-   UDST must be below PHYS_BASE.
-   Returns true if successful, false if a segfault occurred. */
-static bool 
-put_user (uint8_t *udst, uint8_t byte)
-{
-  int error_code;
-  asm ("movl $1f, %0; movb %b2, %1; 1:"
-       : "=&a" (error_code), "=m" (*udst) : "r" (byte));
-  return error_code != -1;
-}
+
 
 int read(int fd, void *buffer, unsigned size) {
 
@@ -362,7 +354,6 @@ int read(int fd, void *buffer, unsigned size) {
     exit(-1);
 
   }
-
  
   lock_acquire(&file_lock);
   if(fd == 0) {
@@ -400,7 +391,6 @@ int read(int fd, void *buffer, unsigned size) {
     return (int) res;
   }
 
-
 }
 
 
@@ -408,10 +398,12 @@ int read(int fd, void *buffer, unsigned size) {
 int write(int fd, const void *buffer, unsigned size) {
 
 
-  if( (fd < 1) || (fd > 129) ||  (!addr_valid(buffer)) ||
-      !(is_mapped(buffer))  ) {
+  /* if( (fd < 1) || (fd > 129) ||  (!addr_valid(buffer)) ||
+     !(is_mapped(buffer))  ) {*/
+  if( (fd < 1) || (fd > 129)  ) {
     exit(-1);
-  }
+    }
+  // printf("..........fd is %d\n", fd);
 
   lock_acquire(&file_lock);
   if(fd == 1) {
