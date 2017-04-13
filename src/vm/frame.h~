@@ -1,0 +1,29 @@
+#ifndef FRH
+#define FRH
+
+#include "threads/thread.h"
+#include "threads/malloc.h"
+#include "threads/synch.h"
+#include "vm/page.h"
+#include <hash.h>
+#include <list.h>
+
+
+struct frame {
+
+  struct spage *sp;
+  //physical address
+  int * kaddr;
+  struct thread *t;
+  //struct hash_elem h_elem;
+  struct list_elem elem;
+
+  bool resident;
+  bool pinned_frame;
+  
+};
+
+void frametable_init(int);
+//unsigned f_hash(struct hash_elem, void*);
+
+#endif
