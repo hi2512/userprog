@@ -172,13 +172,13 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  
+  /*
   printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
-  
+  */
   // printf("There is no crying in Pintos!\n");
   
   /*
@@ -200,7 +200,7 @@ page_fault (struct intr_frame *f)
 	//kill(f);
 	//CHECK FOR A STACK EXPANSION?
 	if(stack_fault(f->esp, fault_addr)) {
-	  printf("SSSSSSSSSSTACK FAULT????\n");
+	  //printf("SSSSSSSSSSTACK FAULT????\n");
 	  /*
 	  if(load_stack(fault_addr)) {
 	    return;
@@ -237,7 +237,6 @@ page_fault (struct intr_frame *f)
     
   }
 
-  
 
   //kill (f);
 }

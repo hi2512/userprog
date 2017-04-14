@@ -22,6 +22,7 @@
 #include "vm/page.h"
 #include "vm/frame.h"
 #include "threads/synch.h"
+#include "userprog/syscall.h"
 
 
 static thread_func start_process NO_RETURN;
@@ -170,6 +171,13 @@ process_wait (tid_t child_tid)
 
 }
 
+//hash_action_func
+void destroy_page(struct hash_elem *e, void *aux UNUSED) {
+
+  struct spage *sp = hash_entry(e, struct spage, h_elem);
+  free(sp);
+  
+}
 
 /* Free the current process's resources. */
 void
@@ -202,6 +210,9 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      destroy_frames(cur);
+      hash_destroy(&cur->spt, destroy_page);
+      
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
@@ -620,6 +631,8 @@ setup_stack (void **esp, char **argv)
   } else {
     palloc_free_page(st->f->kaddr);
   }
+ 
+
   
   //load_stack(((uint8_t *) PHYS_BASE) - PGSIZE, *esp);
 

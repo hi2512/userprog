@@ -219,7 +219,7 @@ void exit(int status) {
 
 
   printf("%s: exit(%d)\n", cur->name_only, status);
-  ASSERT (1 == 0)
+  //ASSERT (1 == 0)
   
   if(cur->parent != NULL) {
     struct exit_status *es = cur->status_in_parent;

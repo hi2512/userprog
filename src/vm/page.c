@@ -53,7 +53,8 @@ bool load_stack(void *addr) {
     // printf("FAILURE??????\n");
   }
   //CHECK THIS LATER
-  st->f->pinned_frame = true;
+  //st->f->pinned_frame = true;
+  //lock_acquire(&st->f->pinned);
   
   return success;
 }
@@ -94,7 +95,7 @@ struct spage * new_spage(struct file *file, off_t ofs, uint8_t *upage,
   //printf("ADDED TO SPT WITH UPAGE: %x ofs: %d bytes: %d\n", upage, ofs, bytes);
   }
   lock_release(&cur->spt_lock);
-  // printf("lock RELEASED!!!!!!\n");
+  //printf("lock RELEASED!!!!!!\n");
       
 
   return sp;
@@ -134,3 +135,5 @@ bool load_page(void *fault_addr) {
 
   
 }
+
+

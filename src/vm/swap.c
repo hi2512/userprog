@@ -35,8 +35,8 @@ bool put_swap(struct frame *f) {
   // printf("START PUT SWAPZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
   // printf("frame's kaddr: %x\n", f->kaddr);
   lock_acquire(&s_lock);
-  //printf("pgsize %d, block sector size: %d, %d\n", PGSIZE, BLOCK_SECTOR_SIZE
-  //,  block_size(swap_block) / page_sector);
+  //printf("pgsize %x, block sector size: %x, %d\n", PGSIZE, BLOCK_SECTOR_SIZE
+  //	 ,  block_size(swap_block) / page_sector);
   /*
   //testing stuff
   char d[512];
@@ -65,21 +65,24 @@ bool put_swap(struct frame *f) {
 
   //write in swap block
   //8 parts for the blocks in a page
-   int x = 0;
-   printf("writing to swap starting from addr %x with %x\n", f->sp->uaddr + x, *(f->kaddr + x));
+   //  printf("writing to swap starting from addr %x with %x\n",
+   //	  f->sp->uaddr, *f->kaddr);
   int i;
   for(i = 0; i < page_sector; i++) {
-    // printf(", %x ", f->kaddr + (page_sector * i));
-    block_write(swap_block, spot + i, f->kaddr +
-		(i * page_sector)); 
+    //printf("W,spot%d,  %x, with  %x      ",spot + i, ((char *)  f->kaddr) +
+    //(BLOCK_SECTOR_SIZE * i),  *(f->kaddr + (BLOCK_SECTOR_SIZE * i)));
+    block_write(swap_block, spot + i, ((void *) f->kaddr) +
+		(i * BLOCK_SECTOR_SIZE));
+    // printf("%x + b_s_s: %x = %x\n", f->kaddr,  BLOCK_SECTOR_SIZE,
+    //	   ((char *) f->kaddr) + BLOCK_SECTOR_SIZE);
   }
-  // printf("spot is: %x\n", f->kaddr);
+  //printf("\n");
   //mark the page as in swap
   f->sp->swap_spot = spot;
 
   //bitmap_dump(swap_map);
   lock_release(&s_lock);
-  //printf("PUT SWAP FINISHEDZZZZZZZZZZZ with swap spot %d\n", f->sp->swap_spot);
+  //printf("PUT SWAP FINISHEDZZZZZZZZZZZ with swap spot %d\n", f->sp->swap_spot / page_sector);
   return true;
 }
 
@@ -87,7 +90,7 @@ bool put_swap(struct frame *f) {
 bool get_swap(uint32_t *kaddr, size_t from_spot) {
 
   lock_acquire(&s_lock);
-  size_t map_spot = from_spot;
+  size_t map_spot = from_spot / page_sector;
   //printf("GET SWAPPPPPPPPPPPPP  spot is %d and to kaddr %x\n",
   //	 map_spot, kaddr);
 
@@ -102,13 +105,17 @@ bool get_swap(uint32_t *kaddr, size_t from_spot) {
   //put all parts into physical memory
   int i;
   for(i = 0; i < page_sector; i++) {
-    block_read(swap_block, map_spot + i, kaddr + (page_sector * i)); 
+    block_read(swap_block, from_spot + i, ((void *)  kaddr)
+	       + (BLOCK_SECTOR_SIZE * i));
+    //printf("R,spot %d, %x      ",from_spot + i, *( ((char *) kaddr)
+    //						   + (BLOCK_SECTOR_SIZE * i)));
   }
+  //printf("\n");
 
   //mark as open spot
   bitmap_set(swap_map, map_spot, false);
   lock_release(&s_lock);
-  printf("got swap finished!!!!!!!!!! read %x\n", *kaddr);
+  // printf("got swap finished!!!!!!!!!! read %x\n", *kaddr);
   return true;
 }
 

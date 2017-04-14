@@ -7,6 +7,8 @@
 #include "tests/main.h"
 
 #define SIZE (2 * 1024 * 1024)
+//#define SIZE (int)  (1.44 * 1024 * 1024)
+
 
 static char buf[SIZE];
 
@@ -22,14 +24,17 @@ test_main (void)
 
   /* Check that it's all 0x5a. */
   msg ("read pass");
-  printf("buf addr is: %x!!!!!!\n", buf);
+  //printf("buf addr is: %x!!!!!!\n", buf);
   for (i = 0; i < SIZE; i++) {
-    //printf("in buf is 0x%x , %d\n", buf[i], i);
+    //printf("in buf 0x%x , is %d\n", buf + i, buf[i]);
     if (buf[i] != 0x5a) {
-      printf("in buf is 0x%x , %d\n", buf[i], i);
+      //printf("in buf 0x%x , is %d\n", buf + i, buf[i]);
       fail ("byte %zu != 0x5a", i);
-      // msg("byte %zu != 0x5a", i);
-      
+      //msg("byte %zu != 0x5a", i);
+      //printf("NOt\n");
+    } else  {
+      //printf("in buf 0x%x , is %d\n", buf + i, buf[i]);
+      //printf("5A!, %d\n", i);
     }
   }
     
