@@ -172,7 +172,7 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  /*
+  /* 
   printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
@@ -227,7 +227,8 @@ page_fault (struct intr_frame *f)
       if(stack_fault(cur->s_esp, fault_addr)) {
 	load_st(cur->s_esp, f);
       }
-       if(!load_page(fault_addr ) ) {
+      // printf("s_esp is: %x\n", cur->s_esp);
+       if(!load_page(cur->s_esp ) ) {
 	 exit(-1);
        }
     }

@@ -210,8 +210,11 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      //enum intr_level old_level;
+      //old_level = intr_disable ();
       destroy_frames(cur);
       hash_destroy(&cur->spt, destroy_page);
+      //intr_set_level (old_level);
       
       cur->pagedir = NULL;
       pagedir_activate (NULL);

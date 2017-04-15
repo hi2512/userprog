@@ -76,7 +76,7 @@ install_page (void *upage, void *kpage, bool writable)
 
 
 void destroy_frames(struct thread *t) {
-
+  
   lock_acquire(&f_lock);
 
   struct hash_iterator i;
@@ -85,14 +85,19 @@ void destroy_frames(struct thread *t) {
   while(hash_next(&i)) {
 
     struct spage *page = hash_entry(hash_cur(&i), struct spage, h_elem);
-    printf("page is for addr %x, is_mapped? %d\n", page->uaddr, page->f != NULL);
-    if(page->f != NULL) {
-      lock_acquire(&page->f);
-      free(page->f);     
-    }
-
+    //printf("page is for addr %x, is_mapped? %d %d\n", page->uaddr,
+    //	   page->f != NULL, pagedir_get_page(t->pagedir, page->uaddr) != NULL);
+    if( (page->f != NULL) && lock_try_acquire(&page->f->pinned)) {
+    // if( page->f != NULL) {
+      //printf("finished with frames\n");
+      //lock_try_acquire(&page->f->pinned);
+      list_remove(&page->f->elem);
+      //printf("finished with frames\n");
+      // free(page->f->kaddr);
+      free(page->f);
+    } 
   }
-
+ 
   lock_release(&f_lock);
   
 }
@@ -220,9 +225,11 @@ bool insert_frame(struct spage *page) {
     //no more mem, must evict frame
     //printf("PALLOC FOR FRAME FAILED\n");
     //printf("THREAD to acquire lock is %d\n", thread_current()->tid);
-    //lock_acquire(&f_lock);
+    lock_acquire(&f_lock);
 
     f = get_frame();
+    ASSERT (lock_held_by_current_thread(&f->pinned))
+    lock_release(&f_lock);
     //f = list_entry(list_prev(list_end(&f_table)), struct frame, elem);
     //printf("frame kaddr is %x\n", f->kaddr);
     //printf("the address that was mapped was: %x to %x \n",
@@ -230,7 +237,7 @@ bool insert_frame(struct spage *page) {
     pagedir_clear_page(f->t->pagedir, f->sp->uaddr);
     //printf("removing page addr %x with %x\n", f->sp->uaddr, *f->kaddr);
  
-    // lock_release(&f_lock);
+
     //printf("GOT FRAME!!!!!!\n");
     //if dirty, send it to swap
     //if(pagedir_is_dirty(f->t->pagedir, f->sp->uaddr)) {
