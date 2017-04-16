@@ -107,6 +107,7 @@ struct frame * get_frame() {
   do {
 
     if(!res->pinned) {
+      res->pinned = true;
       
       //check frame under first clock hand
       if(pagedir_is_accessed(res->t->pagedir, res->sp->uaddr)) {
@@ -135,7 +136,6 @@ struct frame * get_frame() {
 
     if(!res->pinned) {
       res->pinned = true;
-      
       
       //check frame under first clock hand
       if(pagedir_is_accessed(res->t->pagedir, res->sp->uaddr)) {
