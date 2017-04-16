@@ -176,13 +176,15 @@ bool insert_frame(struct spage *page) {
     f = get_frame();
     lock_release(&f_lock);
 
+    lock_acquire(&f->t->spt_lock);
     //remove the mapping for the previous frame
     pagedir_clear_page(f->t->pagedir, f->sp->uaddr);
+    lock_release(&f->t->spt_lock);
     //SEND TO SWAP
     if(!put_swap(f)) {
       exit(-1);
     }
-
+    
     f->sp->f = NULL;
     //frame can now be used
     kaddr = f->kaddr;
