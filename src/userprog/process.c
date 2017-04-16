@@ -157,6 +157,7 @@ process_wait (tid_t child_tid)
     return -1;
   } else {
     //wait until the thread was killed and sema was posted
+    //printf("waiting on %d\n", child_tid);
     sema_down(&waitee->ready);
   }
   
@@ -556,7 +557,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	TEST HERE
 
        */
-      
+      //printf("upage is %x\n", upage);
       //printf("init ram pages: %d\n", init_ram_pages);
       //printf("page read bytes: %d, offset: %d\n",
       //	     (int) page_read_bytes, cur_off);

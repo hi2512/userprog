@@ -114,8 +114,13 @@ bool stack_fault(uint8_t * esp, uint8_t * fault_addr) {
   //printf("comparing esp: %p to fault addr: %p\n", esp , fault_addr);
   //printf("esp is user: %d, fault_addr is user: %d\n",
   //	 is_user_vaddr(esp), is_user_vaddr(fault_addr));
+  //printf("phys base is %x\n", PHYS_BASE);
+  if(fault_addr < (PHYS_BASE - PGSIZE * 500)) {
+    //printf("not in stack range %x\n", PHYS_BASE - PGSIZE * 500);
+    return false;
+  }
   return (fault_addr == (esp - 32)) || (fault_addr == (esp - 4))
-    || (fault_addr >= esp);
+    || (fault_addr >= esp) ;
 }
 
 void load_st(uint8_t *addr, struct intr_frame *f) {
@@ -172,7 +177,7 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  /* 
+  /*
   printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
@@ -194,12 +199,19 @@ page_fault (struct intr_frame *f)
   
   if(not_present) {
     //printf("check user\n");
-    if(user) {
+    //if(user) {
+    if(is_user_vaddr(fault_addr)) {
       //printf("GOing into load page!!\n");
       if(!load_page(fault_addr ) ) {
 	//kill(f);
 	//CHECK FOR A STACK EXPANSION?
-	if(stack_fault(f->esp, fault_addr)) {
+	void * s_esp = NULL;
+	if(user) {
+	  s_esp = f->esp;
+	} else {
+	  s_esp = thread_current()->s_esp;
+	}
+	if(stack_fault(s_esp, fault_addr)) {
 	  //printf("SSSSSSSSSSTACK FAULT????\n");
 	  /*
 	  if(load_stack(fault_addr)) {
@@ -222,18 +234,22 @@ page_fault (struct intr_frame *f)
       }
     } else {
       ///kernel??
+      // ASSERT (is_kernel_vaddr(fault_addr))
       struct thread *cur = thread_current();
       //printf("IS STACK FAULT?: %d\n", stack_fault(cur->s_esp, fault_addr));
-      if(stack_fault(cur->s_esp, fault_addr)) {
-	load_st(cur->s_esp, f);
-      }
-      // printf("s_esp is: %x\n", cur->s_esp);
+      //printf("s_esp is: %x\n", cur->s_esp);
        if(!load_page(cur->s_esp ) ) {
-	 exit(-1);
+	 if(stack_fault(cur->s_esp, fault_addr)) {
+	   load_st(cur->s_esp, f);
+	 } else {
+	   // ASSERT (1 == 0)
+	   exit(-1);
+	 }
        }
     }
   } else {
     //kernel?
+    //printf("WHAT IS THIS\n");
     exit(-1);
     
   }

@@ -82,7 +82,7 @@ bool put_swap(struct frame *f) {
 
   //bitmap_dump(swap_map);
   lock_release(&s_lock);
-  //printf("PUT SWAP FINISHEDZZZZZZZZZZZ with swap spot %d\n", f->sp->swap_spot / page_sector);
+  // printf("PUT SWAP FINISHEDZZZZZZZZZZZ with swap spot %d\n", f->sp->swap_spot / page_sector);
   return true;
 }
 

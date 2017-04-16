@@ -19,7 +19,8 @@ struct frame {
   struct list_elem elem;
 
   // bool resident;
-  struct lock pinned;
+  //struct lock pinned;
+  bool pinned;
   
 };
 

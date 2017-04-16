@@ -61,10 +61,14 @@ bool stack_fault_sys(uint8_t * esp, uint8_t * fault_addr) {
   //printf("SYS comparing esp: %p to fault addr: %p\n", esp , fault_addr);
   //printf("esp is user: %d, fault_addr is user: %d\n",
   // is_user_vaddr(esp), is_user_vaddr(fault_addr));
+  if(!is_user_vaddr(fault_addr)) {
+    exit(-1);
+    return false;
+  }
   return (fault_addr == (esp - 32)) || (fault_addr == (esp - 4))
     || (fault_addr >= esp);
 }
-
+/*
 bool buf_map(void * buf, int size) {
 
   //printf("BUFMAP CALLED for size %d\n", size);
@@ -75,11 +79,13 @@ bool buf_map(void * buf, int size) {
     if(!addr_valid(buf + i)) {
       exit(-1);
     }
-     //printf("%d: CHECKING ADDR: %x\n", i, l_buf);
+    printf("%d: CHECKING ADDR: %x\n", i, l_buf);
     if(!is_mapped(l_buf)) {
       //printf("not mapped FOUND\n");
        if(stack_fault_sys(cur->s_esp, l_buf)) {
+	 //	 printf("grow stack\n");
 	 load_stack(buf + i);
+	  continue;
        }
        //printf("LOAD PAGE FROM BUF MAPNNNNNNNNNNNNN/n");
        load_page(buf + i);
@@ -90,6 +96,81 @@ bool buf_map(void * buf, int size) {
   //printf("returning true\n");
   return true;
 }
+*/
+
+bool buf_map(void * buf, int size) {
+
+  //printf("BUFMAP CALLED for size %d\n", size);
+  struct thread *cur = thread_current();
+  void *l_buf = buf;
+  int i;
+  /*
+  for(i = 0; i < size; i++) {
+    if(!addr_valid(buf + i)) {
+      exit(-1);
+    }
+    // printf("%d: CHECKING ADDR: %x\n", i, l_buf);
+     if(!is_mapped(l_buf) && stack_fault_sys(cur->s_esp, l_buf)) {
+    // if(!addr_valid(l_buf) && stack_fault_sys(cur->s_esp, l_buf)) {
+      //printf("LOAD STACKBUFMAP\n");
+       if(!load_stack(buf + i)) {
+	 // printf("ERROR");
+       }
+    }
+    l_buf++;
+  }
+  */
+  
+  for(i = 0; i <= size; i += PGSIZE) {
+    if(!addr_valid(buf + i)) {
+      exit(-1);
+    }
+
+    
+    //printf("%d: CHECKING ADDR: %x size:%d\n", i, buf + i, size);
+    // if(!is_mapped(buf + i)) {
+      // printf("not mapped FOUND");
+      //load_page_lock(buf + i);
+      //printf("exit load_page\n");
+      //load_page(buf + i);
+      
+    //} 
+    //printf("addr %x pgsize: %x\n", buf + i, PGSIZE);
+    //load_page(buf + i);
+
+       
+	 //LOCK FRAME WHILE READING
+    
+    if(is_mapped(buf + i)) {
+      //printf("already mapped\n");
+      continue;
+    }
+    
+    
+    
+    load_page_lock(buf + i);
+    //printf("finished loading page\n");
+
+      //return false;
+  }
+  //printf("returning true\n");
+  return true;
+}
+
+
+bool unlock_buf(void * buf, int size) {
+
+  struct thread *cur = thread_current();
+  int i;
+  for(i = 0; i < size; i+= PGSIZE) {
+    
+     
+    
+  }
+  //printf("returning true\n");
+  return true;
+}
+
 
 
 //function to read user addresses
@@ -108,6 +189,7 @@ int *arg(int *esp, int num) {
 
   //checks the page directory to get a valid address
   res = (int *) pagedir_get_page(thread_current()->pagedir, t);
+
   ASSERT (is_kernel_vaddr(res));
 
   //printf("krnl addr: %x\n", (void *)  res);
@@ -123,15 +205,19 @@ syscall_handler (struct intr_frame *f)
 
   int *a = f->esp;
 
+  thread_current()->s_esp = a;
+
+  //printf("esp is %x\n", a);
 
   //do validity check
-  if( !( addr_valid(a) && is_mapped(a) )  ) {
+  //if( !( addr_valid(a) && is_mapped(a) )  ) {
+  if( !( addr_valid(a)  )  ) {
     //kill b/c bad pointer
     exit(-1);
     
   }
 
-  thread_current()->s_esp = a;
+  
 
   
   //switch depending on enums in syscall-nr.h
@@ -161,13 +247,16 @@ syscall_handler (struct intr_frame *f)
       f->eax = filesize(*arg(a, 1));
       break;
     case SYS_READ :
-      // printf("buffer IS: %x\n", *arg(a,2));
+      //printf("buffer IS: %x\n", *arg(a,2));
       buf_map(*arg(a, 2), (int) *arg(a, 3));
       f->eax = read(*arg(a, 1), *arg(a, 2), *arg(a, 3));
+      //printf("read done\n");
       break;
     case SYS_WRITE :
+      // printf("buffer IS: %x\n", *arg(a,2));
       buf_map(*arg(a, 2), (int) *arg(a, 3));
       f->eax = write(*arg(a, 1), *arg(a, 2), *arg(a, 3));
+      //printf("write done\n");
       break;
     case SYS_SEEK :
       seek(*arg(a, 1), *arg(a, 2));
@@ -350,6 +439,7 @@ int read(int fd, void *buffer, unsigned size) {
   //printf("buf_map: %d\n", buf_map(buffer, (int) size));
   // if( (fd < 0) || (fd == 1) ||  (fd > 129) ||  (!addr_valid(buffer))  
   //    ||  (!is_mapped(buffer)) ) {
+  // printf("..........fd is %d\n", fd);
   if( (fd < 0) || (fd == 1) ||  (fd > 129) ) {
     exit(-1);
 
