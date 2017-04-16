@@ -40,15 +40,6 @@ bool addr_valid(int *esp) {
 }
 
 
-//HERE
-
-
-
-
-
-
-//TRY TO LOAD PAGE IF NOT MAPPED???????????
-
 
 bool is_mapped(int *esp) {
   
@@ -58,9 +49,6 @@ bool is_mapped(int *esp) {
 }
 
 bool stack_fault_sys(uint8_t * esp, uint8_t * fault_addr) {
-  //printf("SYS comparing esp: %p to fault addr: %p\n", esp , fault_addr);
-  //printf("esp is user: %d, fault_addr is user: %d\n",
-  // is_user_vaddr(esp), is_user_vaddr(fault_addr));
   if(!is_user_vaddr(fault_addr)) {
     exit(-1);
     return false;
@@ -68,120 +56,34 @@ bool stack_fault_sys(uint8_t * esp, uint8_t * fault_addr) {
   return (fault_addr == (esp - 32)) || (fault_addr == (esp - 4))
     || (fault_addr >= esp);
 }
-/*
+
+//check the validity of the buffer and load if needed
 bool buf_map(void * buf, int size) {
 
-  //printf("BUFMAP CALLED for size %d\n", size);
-  struct thread *cur = thread_current();
-  uint8_t *l_buf = (uint8_t *) buf;
-  int i;
-  for(i = 0; i < size; i++) {
-    if(!addr_valid(buf + i)) {
-      exit(-1);
-    }
-    printf("%d: CHECKING ADDR: %x\n", i, l_buf);
-    if(!is_mapped(l_buf)) {
-      //printf("not mapped FOUND\n");
-       if(stack_fault_sys(cur->s_esp, l_buf)) {
-	 //	 printf("grow stack\n");
-	 load_stack(buf + i);
-	  continue;
-       }
-       //printf("LOAD PAGE FROM BUF MAPNNNNNNNNNNNNN/n");
-       load_page(buf + i);
-      //return false;
-      }
-    l_buf++;
-  }
-  //printf("returning true\n");
-  return true;
-}
-*/
-
-bool buf_map(void * buf, int size) {
-
-  //printf("BUFMAP CALLED for size %d\n", size);
   struct thread *cur = thread_current();
   void *l_buf = buf;
   int i;
-  /*
-  for(i = 0; i < size; i++) {
+  //check the buffer by pages to see if loaded
+  for(i = 0; i < size; i += PGSIZE) {
     if(!addr_valid(buf + i)) {
       exit(-1);
     }
-    // printf("%d: CHECKING ADDR: %x\n", i, l_buf);
-     if(!is_mapped(l_buf) && stack_fault_sys(cur->s_esp, l_buf)) {
-    // if(!addr_valid(l_buf) && stack_fault_sys(cur->s_esp, l_buf)) {
-      //printf("LOAD STACKBUFMAP\n");
-       if(!load_stack(buf + i)) {
-	 // printf("ERROR");
-       }
-    }
-    l_buf++;
-  }
-  */
-  
-  for(i = 0; i <= size; i += PGSIZE) {
-    if(!addr_valid(buf + i)) {
-      exit(-1);
-    }
-
-    
-    //printf("%d: CHECKING ADDR: %x size:%d\n", i, buf + i, size);
-    // if(!is_mapped(buf + i)) {
-      // printf("not mapped FOUND");
-      //load_page_lock(buf + i);
-      //printf("exit load_page\n");
-      //load_page(buf + i);
-      
-    //} 
-    //printf("addr %x pgsize: %x\n", buf + i, PGSIZE);
-    //load_page(buf + i);
-
-       
-	 //LOCK FRAME WHILE READING
-    
     if(is_mapped(buf + i)) {
-      //printf("already mapped\n");
+      //not needed for this page
       continue;
     }
-    
-    
-    
     load_page_lock(buf + i);
-    //printf("finished loading page\n");
-
-      //return false;
   }
-  //printf("returning true\n");
   return true;
 }
-
-
-bool unlock_buf(void * buf, int size) {
-
-  struct thread *cur = thread_current();
-  int i;
-  for(i = 0; i < size; i+= PGSIZE) {
-    
-     
-    
-  }
-  //printf("returning true\n");
-  return true;
-}
-
 
 
 //function to read user addresses
 int *arg(int *esp, int num) {
 
-  // printf("user addr: %p\n", (void *)  esp);
-  
   int *res = NULL;
   int *t = esp;
   t += num;
-  // printf("user addr after add: %x of %d\n", (void *)  t, num);
   
   if(!addr_valid(t)) {
     exit(-1);
@@ -191,8 +93,6 @@ int *arg(int *esp, int num) {
   res = (int *) pagedir_get_page(thread_current()->pagedir, t);
 
   ASSERT (is_kernel_vaddr(res));
-
-  //printf("krnl addr: %x\n", (void *)  res);
   
   return res;
   
@@ -205,12 +105,10 @@ syscall_handler (struct intr_frame *f)
 
   int *a = f->esp;
 
+  //save the pointer if faulted in kernel mode
   thread_current()->s_esp = a;
 
-  //printf("esp is %x\n", a);
-
   //do validity check
-  //if( !( addr_valid(a) && is_mapped(a) )  ) {
   if( !( addr_valid(a)  )  ) {
     //kill b/c bad pointer
     exit(-1);
@@ -247,16 +145,14 @@ syscall_handler (struct intr_frame *f)
       f->eax = filesize(*arg(a, 1));
       break;
     case SYS_READ :
-      //printf("buffer IS: %x\n", *arg(a,2));
+      //check the buffer
       buf_map(*arg(a, 2), (int) *arg(a, 3));
       f->eax = read(*arg(a, 1), *arg(a, 2), *arg(a, 3));
-      //printf("read done\n");
       break;
     case SYS_WRITE :
-      // printf("buffer IS: %x\n", *arg(a,2));
+      //same for write
       buf_map(*arg(a, 2), (int) *arg(a, 3));
       f->eax = write(*arg(a, 1), *arg(a, 2), *arg(a, 3));
-      //printf("write done\n");
       break;
     case SYS_SEEK :
       seek(*arg(a, 1), *arg(a, 2));
@@ -308,7 +204,6 @@ void exit(int status) {
 
 
   printf("%s: exit(%d)\n", cur->name_only, status);
-  //ASSERT (1 == 0)
   
   if(cur->parent != NULL) {
     struct exit_status *es = cur->status_in_parent;
@@ -433,13 +328,7 @@ int filesize(int fd) {
 
 int read(int fd, void *buffer, unsigned size) {
 
-  //check for valid fd and buffer
-  // printf("addr valid: %d\n", addr_valid(buffer));
-  //printf("is mapped %d\n", is_mapped(buffer));
-  //printf("buf_map: %d\n", buf_map(buffer, (int) size));
-  // if( (fd < 0) || (fd == 1) ||  (fd > 129) ||  (!addr_valid(buffer))  
-  //    ||  (!is_mapped(buffer)) ) {
-  // printf("..........fd is %d\n", fd);
+  //check for valid fd
   if( (fd < 0) || (fd == 1) ||  (fd > 129) ) {
     exit(-1);
 
@@ -463,20 +352,7 @@ int read(int fd, void *buffer, unsigned size) {
     lock_release(&file_lock);
     return -1;
   } else {
-    //printf("entering file read\n");
-    //uint8_t *fu = malloc(size);
     off_t res = file_read(f, buffer, (off_t) size);
-    //off_t res = file_read(f, fu, (off_t) size);
-    //printf("done file");
-    /*
-    int i;
-    int s = (int) size;
-    for(i = 0; i < s; i++) {
-      printf("i:%d buffer + i: %p\n",i, buffer + i);
-      put_user(buffer + i, *(fu + i));
-    }
-    free(fu);
-    */
     lock_release(&file_lock);
     return (int) res;
   }
@@ -488,12 +364,9 @@ int read(int fd, void *buffer, unsigned size) {
 int write(int fd, const void *buffer, unsigned size) {
 
 
-  /* if( (fd < 1) || (fd > 129) ||  (!addr_valid(buffer)) ||
-     !(is_mapped(buffer))  ) {*/
   if( (fd < 1) || (fd > 129)  ) {
     exit(-1);
     }
-  // printf("..........fd is %d\n", fd);
 
   lock_acquire(&file_lock);
   if(fd == 1) {

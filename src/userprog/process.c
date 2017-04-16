@@ -211,12 +211,10 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
-      //enum intr_level old_level;
-      //old_level = intr_disable ();
+      //clean up the used frames
       destroy_frames(cur);
       hash_destroy(&cur->spt, destroy_page);
-      //intr_set_level (old_level);
-      
+
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
@@ -537,13 +535,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  //printf("LOAD SEGMENT CALLED\n");
 
-  //palloc_get_page(PAL_USER);
-
-   file_seek (file, ofs);
+  file_seek (file, ofs);
   off_t cur_off = ofs;
-  //printf("file size is %d\n", file_length(file));
   
   while (read_bytes > 0 || zero_bytes > 0) 
     {
@@ -553,21 +547,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /*
-	TEST HERE
 
-       */
-      //printf("upage is %x\n", upage);
-      //printf("init ram pages: %d\n", init_ram_pages);
-      //printf("page read bytes: %d, offset: %d\n",
-      //	     (int) page_read_bytes, cur_off);
-      //printf("page zero bytes: %d\n", (int) page_zero_bytes);
-      //printf("tot: %d\n", (int) (page_read_bytes + page_zero_bytes));
-      //printf("offset is: %d\n", cur_off);
-
-      //printf("FIle pos is %d \n", file_tell(file));
-           
-      
+      //establish entry in spt and nothing else
       struct spage *sp = new_spage(file, cur_off, upage,
 		         page_read_bytes, page_zero_bytes, writable);
 
@@ -576,10 +557,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-
-
+      //new file offset
       cur_off += page_read_bytes;
-      //printf("OFF AFTER ADDING %d\n", cur_off);
     }
   return true;
 }
@@ -611,24 +590,9 @@ setup_stack (void **esp, char **argv)
 
   //calc alignment
   align = ps - (total_len % ps);
-  /*
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) 
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success) {
-	*esp = PHYS_BASE;
-
-      }
-      else {
-        palloc_free_page (kpage);
-      }
-    }
-  */
-  //  printf("THIS IS THE STACK PAGE\n");
   struct spage *st = new_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - PGSIZE,
 			       0, 0, true);
-
+  //load the stack page
   success = load_page(st->uaddr);
   if(success) {
     *esp = PHYS_BASE;
@@ -637,8 +601,6 @@ setup_stack (void **esp, char **argv)
   }
  
 
-  
-  //load_stack(((uint8_t *) PHYS_BASE) - PGSIZE, *esp);
 
     //add args
     int i;

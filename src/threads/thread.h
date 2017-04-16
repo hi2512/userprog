@@ -123,14 +123,12 @@ struct thread
     struct file *my_file;
 #endif
 
-
+    //the supplemental page table and its lock
     struct hash spt;
     struct lock spt_lock;
 
     //saved esp for page fault sys calls
     uint8_t *s_esp;
-
-    
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

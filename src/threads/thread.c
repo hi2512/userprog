@@ -16,6 +16,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "threads/malloc.h"
+#include "userprog/syscall.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -208,6 +209,9 @@ thread_create (const char *name, int priority,
   t->parent = cur;
   sema_init(&t->exec_sem, 0);
   struct exit_status *es = malloc(sizeof(struct exit_status));
+  if(es == NULL) {
+    exit(-1);
+  }
   sema_init(&es->ready, 0);
   es->t = t;
   es->tid = tid;

@@ -18,6 +18,7 @@ static struct lock s_lock;
 //8 block sectors to a page, PGSIZE / BLOCK_SECTOR_SIZE
 static int page_sector = PGSIZE / BLOCK_SECTOR_SIZE;
 
+//Eric driving
 void swap_init() {
 
   swap_block = block_get_role(BLOCK_SWAP);
@@ -32,31 +33,13 @@ void swap_init() {
 
 bool put_swap(struct frame *f) {
 
-  // printf("START PUT SWAPZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
-  // printf("frame's kaddr: %x\n", f->kaddr);
   lock_acquire(&s_lock);
-  //printf("pgsize %x, block sector size: %x, %d\n", PGSIZE, BLOCK_SECTOR_SIZE
-  //	 ,  block_size(swap_block) / page_sector);
-  /*
-  //testing stuff
-  char d[512];
-  int i;
-  for(i = 0; i < 512; i++) {
-    d[i] = 'a';
-  }
-  for(i = 0; i < 9000; i++) {
-    printf("check sector %d,\n", i);
-    block_write(swap_block, i, d);
-  }
-  */
-
   //take this frame and put it in swap
   //find spot in bitmap
   size_t spot = bitmap_scan_and_flip(swap_map, 0, 1, false);
   if(spot == BITMAP_ERROR) {
     //swap full
-    //do something
-    printf("BITMAP ERROR\n");
+    //printf("BITMAP ERROR\n");
     lock_release(&s_lock);
     return false;
   }
@@ -65,24 +48,15 @@ bool put_swap(struct frame *f) {
 
   //write in swap block
   //8 parts for the blocks in a page
-   //  printf("writing to swap starting from addr %x with %x\n",
-   //	  f->sp->uaddr, *f->kaddr);
   int i;
   for(i = 0; i < page_sector; i++) {
-    //printf("W,spot%d,  %x, with  %x      ",spot + i, ((char *)  f->kaddr) +
-    //(BLOCK_SECTOR_SIZE * i),  *(f->kaddr + (BLOCK_SECTOR_SIZE * i)));
     block_write(swap_block, spot + i, ((void *) f->kaddr) +
 		(i * BLOCK_SECTOR_SIZE));
-    // printf("%x + b_s_s: %x = %x\n", f->kaddr,  BLOCK_SECTOR_SIZE,
-    //	   ((char *) f->kaddr) + BLOCK_SECTOR_SIZE);
   }
-  //printf("\n");
   //mark the page as in swap
   f->sp->swap_spot = spot;
 
-  //bitmap_dump(swap_map);
   lock_release(&s_lock);
-  // printf("PUT SWAP FINISHEDZZZZZZZZZZZ with swap spot %d\n", f->sp->swap_spot / page_sector);
   return true;
 }
 
@@ -90,15 +64,13 @@ bool put_swap(struct frame *f) {
 bool get_swap(uint32_t *kaddr, size_t from_spot) {
 
   lock_acquire(&s_lock);
+  //this is the spot in the bitmap
   size_t map_spot = from_spot / page_sector;
-  //printf("GET SWAPPPPPPPPPPPPP  spot is %d and to kaddr %x\n",
-  //	 map_spot, kaddr);
 
   //check spot 
   if(!bitmap_contains(swap_map, map_spot, 1, true)) {
     //error
-    //do something
-    printf("BITMAP ERROR get swap\n");
+    //printf("BITMAP ERROR get swap\n");
     lock_release(&s_lock);
     return false;
   }
@@ -107,15 +79,11 @@ bool get_swap(uint32_t *kaddr, size_t from_spot) {
   for(i = 0; i < page_sector; i++) {
     block_read(swap_block, from_spot + i, ((void *)  kaddr)
 	       + (BLOCK_SECTOR_SIZE * i));
-    //printf("R,spot %d, %x      ",from_spot + i, *( ((char *) kaddr)
-    //						   + (BLOCK_SECTOR_SIZE * i)));
   }
-  //printf("\n");
 
   //mark as open spot
   bitmap_set(swap_map, map_spot, false);
   lock_release(&s_lock);
-  // printf("got swap finished!!!!!!!!!! read %x\n", *kaddr);
   return true;
 }
 

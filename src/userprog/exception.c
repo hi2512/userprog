@@ -111,12 +111,8 @@ kill (struct intr_frame *f)
 }
 
 bool stack_fault(uint8_t * esp, uint8_t * fault_addr) {
-  //printf("comparing esp: %p to fault addr: %p\n", esp , fault_addr);
-  //printf("esp is user: %d, fault_addr is user: %d\n",
-  //	 is_user_vaddr(esp), is_user_vaddr(fault_addr));
-  //printf("phys base is %x\n", PHYS_BASE);
+  //check if within a reasonable range
   if(fault_addr < (PHYS_BASE - PGSIZE * 500)) {
-    //printf("not in stack range %x\n", PHYS_BASE - PGSIZE * 500);
     return false;
   }
   return (fault_addr == (esp - 32)) || (fault_addr == (esp - 4))
@@ -125,7 +121,6 @@ bool stack_fault(uint8_t * esp, uint8_t * fault_addr) {
 
 void load_st(uint8_t *addr, struct intr_frame *f) {
 
-  //printf("LOAD STACK CALLED with %p\n",  addr);
   if(load_stack(addr)) {
      return;
   } else {
@@ -187,6 +182,7 @@ page_fault (struct intr_frame *f)
   // printf("There is no crying in Pintos!\n");
   
   /*
+  //userprog
   if(user) {
     sema_up(&thread_current()->status_in_parent->ready);
     exit(-1);
@@ -194,16 +190,11 @@ page_fault (struct intr_frame *f)
     return;
   }
   */
-  //printf("Check present\n");
 
   
   if(not_present) {
-    //printf("check user\n");
-    //if(user) {
     if(is_user_vaddr(fault_addr)) {
-      //printf("GOing into load page!!\n");
       if(!load_page(fault_addr ) ) {
-	//kill(f);
 	//CHECK FOR A STACK EXPANSION?
 	void * s_esp = NULL;
 	if(user) {
@@ -212,18 +203,10 @@ page_fault (struct intr_frame *f)
 	  s_esp = thread_current()->s_esp;
 	}
 	if(stack_fault(s_esp, fault_addr)) {
-	  //printf("SSSSSSSSSSTACK FAULT????\n");
-	  /*
-	  if(load_stack(fault_addr)) {
-	    return;
-	  } else {
-	    kill(f);
-	  }
-	  */
+	  //then load the stack
 	  load_st(fault_addr, f);
 	} else {
-	  // printf("NOT A STACK FAULT OR PAGE\n");
-	  //kill(f);
+	  //none of the above
 	   exit(-1);
 	}
 
@@ -233,23 +216,18 @@ page_fault (struct intr_frame *f)
 	return;
       }
     } else {
-      ///kernel??
-      // ASSERT (is_kernel_vaddr(fault_addr))
+      //kernel?
       struct thread *cur = thread_current();
-      //printf("IS STACK FAULT?: %d\n", stack_fault(cur->s_esp, fault_addr));
-      //printf("s_esp is: %x\n", cur->s_esp);
        if(!load_page(cur->s_esp ) ) {
 	 if(stack_fault(cur->s_esp, fault_addr)) {
 	   load_st(cur->s_esp, f);
 	 } else {
-	   // ASSERT (1 == 0)
 	   exit(-1);
 	 }
        }
     }
   } else {
-    //kernel?
-    //printf("WHAT IS THIS\n");
+    //error
     exit(-1);
     
   }

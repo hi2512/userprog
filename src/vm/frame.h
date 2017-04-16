@@ -11,14 +11,13 @@
 
 struct frame {
 
+  //page in the frame
   struct spage *sp;
   //physical address
   uint32_t * kaddr;
   struct thread *t;
-  //struct hash_elem h_elem;
   struct list_elem elem;
 
-  // bool resident;
   //struct lock pinned;
   bool pinned;
   

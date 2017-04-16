@@ -13,8 +13,8 @@
 #include <hash.h>
 #include "threads/thread.h"
 
-
-
+//Eric driving
+//functions for the hash table
 bool p_less(const struct hash_elem *a, const struct hash_elem *b,
 	    void *aux UNUSED) {
 
@@ -43,25 +43,23 @@ bool load_stack(void *addr) {
 
   struct spage *st = new_spage(NULL, 0, (uint8_t *) pg_round_down(addr),
 			       0, 0, true);
-  //printf("going to stack load page....");
   bool success = load_page(st->uaddr);
   if(!success) {
     exit(-1);
   } 
-  //CHECK THIS LATER
-  //st->f->pinned_frame = true;
-  //lock_acquire(&st->f->pinned);
+
   
   return success;
 }
 
+//setup the new spt entry
 struct spage * new_spage(struct file *file, off_t ofs, uint8_t *upage,
 			 size_t bytes, size_t zero_bytes,  bool writable) {
 
   struct spage *sp = malloc(sizeof(struct spage));
   if(sp == NULL) {
     //not enough memory
-    exit(-2);
+    exit(-1);
   }
   sp->t = thread_current();
   sp->uaddr = upage;
@@ -69,8 +67,6 @@ struct spage * new_spage(struct file *file, off_t ofs, uint8_t *upage,
   sp->bytes = bytes;
   sp->zeros = zero_bytes;
 
-  //printf("bytes spage: %d\n", (int) sp->bytes);
-  //printf("bytes spage offset: %d\n",(int) sp->offset);
   sp->my_file = file;
   sp->writable = writable;
 
@@ -80,18 +76,12 @@ struct spage * new_spage(struct file *file, off_t ofs, uint8_t *upage,
 
   //add to spt
   struct thread *cur = thread_current();
-  // printf("lock acquire.......");
   lock_acquire(&cur->spt_lock);
-  // printf("DONEEEEE!\n");
 
   if(hash_insert(&thread_current()->spt, &sp->h_elem) != NULL) {
-    //printf("CHECK:    ALREADY ELEMENT OF HASH?\n");
-  } else {
-    ASSERT (is_user_vaddr(upage))
-      //printf("ADDED TO SPT WITH UPAGE: %x ofs: %d bytes: %d\n", upage, ofs, bytes);
-  }
+    //printf("ALREADY ELEMENT OF HASH?\n");
+  } 
   lock_release(&cur->spt_lock);
-  //printf("lock RELEASED!!!!!!\n");
       
 
   return sp;
@@ -101,16 +91,13 @@ struct spage * new_spage(struct file *file, off_t ofs, uint8_t *upage,
 //page faulted, so load that page and put into a frame
 bool load_page(void *fault_addr) {
 
-  
+  //get the aligned address for the page table
   uint8_t * faddr = (uint8_t *) fault_addr;
-  //printf("The faulting addr is %x\n", faddr);
   uint8_t * align_uaddr = (uint8_t *) pg_round_down(fault_addr);
-  //printf("The addr after align is %x\n", align_uaddr);
-  ASSERT (is_user_vaddr(fault_addr))
+    ASSERT (is_user_vaddr(fault_addr))
 
-  //printf("spans to addr: %x\n", (uint8_t *) pg_round_up(fault_addr + 1));
 
-  //get kaddr
+  //get kaddr by using this with hash_find
   struct spage adr;
   adr.uaddr = align_uaddr;
 
@@ -120,10 +107,8 @@ bool load_page(void *fault_addr) {
     // printf("ADDRESS NOT FOUND IN SPT\n");
     return false;
   } else {
-    //printf("page found!!\n");
+    //found the entry and load it
     to_load = hash_entry(he, struct spage, h_elem);
-    //printf("Spage dt bytes: %d, zeros: %d\n",to_load->bytes, to_load->zeros);
-    //printf("INserting frame!!\n");
     return insert_frame(to_load);
   }
   
@@ -132,16 +117,12 @@ bool load_page(void *fault_addr) {
   
 }
 
+//functionally the same but locks the frame
 bool load_page_lock(void *fault_addr) {
 
-  
   uint8_t * faddr = (uint8_t *) fault_addr;
-  //printf("The faulting addr is %x\n", faddr);
   uint8_t * align_uaddr = (uint8_t *) pg_round_down(fault_addr);
-  // printf("The addr after align is %x\n", align_uaddr);
-  ASSERT (is_user_vaddr(fault_addr))
-
-  //printf("spans to addr: %x\n", (uint8_t *) pg_round_up(fault_addr + 1));
+    ASSERT (is_user_vaddr(fault_addr))
 
   //get kaddr
   struct spage adr;
@@ -153,10 +134,7 @@ bool load_page_lock(void *fault_addr) {
     //printf("ADDRESS NOT FOUND IN SPT\n");
     return false;
   } else {
-    //printf("page found!!\n");
     to_load = hash_entry(he, struct spage, h_elem);
-    //printf("Spage dt bytes: %d, zeros: %d\n",to_load->bytes, to_load->zeros);
-    //printf("INserting frame!!\n");
     bool suc = insert_frame(to_load);
     if(suc) {
       to_load->f->pinned = true;

@@ -22,40 +22,15 @@ static struct list f_table;
 
 static struct lock f_lock;
 
+//the "clock hand"
 struct list_elem *next_check;
 
 
-/*
-bool f_less(const struct hash_elem *a, const struct hash_elem *b,
-	    void *aux UNUSED) {
-
-  struct frame *from = hash_entry(a, struct frame, h_elem);
-  struct frame *to = hash_entry(b, struct frame, h_elem);
-  return from->kaddr < to->kaddr;
-  
-  
-}
-
-unsigned f_hash(struct hash_elem *e, void *aux UNUSED) {
-
-  struct frame *f = hash_entry(e, struct frame, h_elem);
-  return hash_int((int) f->kaddr);
-  
-}
-*/
-
-
+//Eric driving
 //set up the frame table with available frames
 void frametable_init(int upage_limit UNUSED) {
 
-  //taken from palloc
-  /*
-  uint8_t *free_start = ptov (1024 * 1024);
-  uint8_t *free_end = ptov (init_ram_pages * PGSIZE);
-  size_t free_pages = (free_end - free_start) / PGSIZE;
-  */
-  
-  //hash_init(&f_table, f_hash, f_less, NULL);
+
   list_init(&f_table);
   lock_init(&f_lock);
   
@@ -63,6 +38,7 @@ void frametable_init(int upage_limit UNUSED) {
 
 }
 
+//from process.c
 static bool
 install_page (void *upage, void *kpage, bool writable)
 {
@@ -74,40 +50,7 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-
-void destroy_frames(struct thread *t) {
-  
-  lock_acquire(&f_lock);
-  
-  struct hash_iterator i;
-
-  hash_first(&i, &t->spt);
-  while(hash_next(&i)) {
-
-    struct spage *page = hash_entry(hash_cur(&i), struct spage, h_elem);
-  //if( (page->f != NULL) && lock_try_acquire(&page->f->pinned)) {
-    if( (page->f != NULL) && !(page->f->pinned) ) {
-    // if( page->f != NULL) {
-      //printf("finished with frames\n");
-      //lock_try_acquire(&page->f->pinned);
-      if (&page->f->elem == next_check) {
-        set_nc();
-      }
-      list_remove(&page->f->elem);
-      //printf("page is for addr %x, is_mapped? %d %d\n", page->uaddr,
-      //   page->f != NULL, pagedir_get_page(t->pagedir, page->uaddr) != NULL);
-      //printf("try to free page with kaddr %x\n", page->f->kaddr);
-      // free(page->f->kaddr);
-      //palloc_free_page(page->f->kaddr);
-       free(page->f);
-    } 
-  }
-  
-
-  lock_release(&f_lock);
-  
-}
-
+//sets the next check elem
 void set_nc() {
   //not at end, so next elem
   next_check = list_next(next_check);
@@ -118,6 +61,34 @@ void set_nc() {
   }
 
 }
+
+//Ramon driving
+//function to remove frames from frame table after process dies
+void destroy_frames(struct thread *t) {
+  
+  lock_acquire(&f_lock);
+  
+  struct hash_iterator i;
+
+  hash_first(&i, &t->spt);
+  while(hash_next(&i)) {
+
+    struct spage *page = hash_entry(hash_cur(&i), struct spage, h_elem);
+    if( (page->f != NULL) && !(page->f->pinned) ) {
+      if (&page->f->elem == next_check) {
+        set_nc();
+      }
+      list_remove(&page->f->elem);
+      free(page->f);
+    } 
+  }
+  
+
+  lock_release(&f_lock);
+  
+}
+
+
 
 //get frame with second chance clock
 struct frame * get_frame() {
@@ -134,10 +105,7 @@ struct frame * get_frame() {
   first = res->kaddr;
 
   do {
-    // printf("checking frame addr:%x, pinned %d\n", res->kaddr,
-    //res->pinned_frame);
 
-    //if(lock_try_acquire(&res->pinned)) {
     if(!res->pinned) {
       
       //check frame under first clock hand
@@ -153,32 +121,18 @@ struct frame * get_frame() {
           return res;
         }
       }
-      //lock_release(&res->pinned);
       res->pinned = false;
     }
 
-    //AND HERE
     
     set_nc();
-    /*
-    //not at end, so next elem
-    next_check = list_next(next_check);
-    //next, if last goto first
-    if(next_check == list_end(&f_table)) {
-      next_check = list_begin(&f_table);
-    }
-    */
     //stop if at the first elem checked
     res = list_entry(next_check, struct frame, elem);
   } while (res->kaddr != first);
-  //printf("FINISHED FIRST SWEEP\n");
   
   //first sweep done, again but dirty page can be evicted
     do {
-      //printf("DIRTY checking frame addr:%x, pinned %d\n", res->kaddr,
-      //	   res->pinned_frame);
 
-  //if(lock_try_acquire(&res->pinned)) {
     if(!res->pinned) {
       res->pinned = true;
       
@@ -190,12 +144,9 @@ struct frame * get_frame() {
 	set_nc();
         return res;
       }
-      //lock_release(&res->pinned);
       res->pinned = false;
     }
 
-    //!!!!!!!!!!!!!!!!!
-    //res->pinned_frame = false;
     set_nc();
     res = list_entry(next_check, struct frame, elem);
    
@@ -210,87 +161,52 @@ struct frame * get_frame() {
 
 bool insert_frame(struct spage *page) {
 
-  //enum intr_level old_level;
-  //old_level = intr_disable ();
+
   
   //taken and modified from load segment
-  //void *kaddr = palloc_get_page(PAL_USER | zero);
   uint32_t *kaddr = palloc_get_page(PAL_USER | PAL_ZERO);
-  //printf("uaddr to frame is: %x for %d\n", page->uaddr, thread_current()->tid);
 
   struct frame *f = NULL;
-  //put_swap(f);
-  
-
 
   
   if(kaddr == NULL) {
     //no more mem, must evict frame
-    //printf("PALLOC FOR FRAME FAILED\n");
-    //printf("THREAD to acquire lock is %d\n", thread_current()->tid);
     lock_acquire(&f_lock);
 
     f = get_frame();
-    // ASSERT (lock_held_by_current_thread(&f->pinned))
     lock_release(&f_lock);
 
-
-    
-    //f = list_entry(list_prev(list_end(&f_table)), struct frame, elem);
-    //printf("frame kaddr is %x\n", f->kaddr);
-    //printf("the address that was mapped was: %x to %x \n",
-    //	   f->sp->uaddr, pagedir_get_page(f->t->pagedir, f->sp->uaddr));
+    //remove the mapping for the previous frame
     pagedir_clear_page(f->t->pagedir, f->sp->uaddr);
-    //printf("removing page addr %x with %x\n", f->sp->uaddr, *f->kaddr);
- 
-
-    //printf("GOT FRAME!!!!!!\n");
-    //if dirty, send it to swap
-    //if(pagedir_is_dirty(f->t->pagedir, f->sp->uaddr)) {
-      //SEND TO SWAP
-      // printf(" !!!\n");
-      if(!put_swap(f)) {
-	//printf("put swap failed!!!!!!!!\n");
-	exit(-13);
-      }
-
-      /*
-    } else {
-      printf("%x page is not dirty\n", f->sp->uaddr);
+    //SEND TO SWAP
+    if(!put_swap(f)) {
+      exit(-1);
     }
-      */
-      
 
     f->sp->f = NULL;
-    //clear it
-    //memset(f->kaddr, 0, PGSIZE);
     //frame can now be used
     kaddr = f->kaddr;
-    //printf("FRAME READY FOR REALLOCATION\n");
    
   } else {
     //new frame
-    //printf("allocated new frame with addr %x\n", kaddr);
     f = malloc(sizeof(struct frame));
+    if(f == NULL) {
+      exit(-1);
+    }
 
-    //lock_init(&f->pinned);
-    //lock_acquire(&f->pinned);
     f->pinned = true;
     
     lock_acquire(&f_lock);
     list_push_back(&f_table, &f->elem);
-    //hash_insert(&f_table, &f->h_elem);
     lock_release(&f_lock);
   }
 
-  // ASSERT (lock_held_by_current_thread(&f->pinned))
   
   /*
     Check if my page is in swap
    */
   if(page->swap_spot != -1) {
     //read from swap
-    //printf("getting from swap for addr %x \n", page->uaddr);
     get_swap(kaddr, page->swap_spot);
     //mark page as no longer in swap
     page->swap_spot = -1;
@@ -298,20 +214,14 @@ bool insert_frame(struct spage *page) {
     //read from file or put zeros
     if(page->my_file != NULL) {
       //more or less from load segment
-      //printf("FIle pos is %d   XXXXXXX\n", file_tell(page->my_file));
-  
       file_seek(page->my_file, page->offset);
-      // printf(" NEW FIle pos is %d   XXXXXXX\n", file_tell(page->my_file));
       // Load this page.
       if(file_read (page->my_file, kaddr, page->bytes)
          != (int) page->bytes)  {
         palloc_free_page (kaddr);
         return false; 
       }
-    } else {
-      //printf("00000000000000 frame, no file\n");
-      // f->pinned_frame = true;
-    }
+    } 
     memset (kaddr + page->bytes, 0, page->zeros);
 
   }
@@ -321,15 +231,13 @@ bool insert_frame(struct spage *page) {
   // Add the page to the process's address space.
   if(!install_page (page->uaddr, kaddr, page->writable))  {
     palloc_free_page (kaddr);
-    //printf("INSTALL FAILED\n");
     return false; 
   }
     
     
   //put frame into frame table
-  //struct frame *f = malloc(sizeof(struct frame));
   if(f == NULL) {
-    exit(-2);
+    exit(-1);
     return false;
   }
   f->sp = page;
@@ -338,22 +246,11 @@ bool insert_frame(struct spage *page) {
   
 
   page->f = f;
-
+  //frame is ready
   f->pinned = false;
-  //lock_release(&f->pinned);
 
-  ASSERT(is_kernel_vaddr(f->kaddr))
-  ASSERT( f->kaddr == pagedir_get_page(thread_current()->pagedir
-					   , page->uaddr) )
-  //printf("Frame inserted at phy/krnl addr: %x for uaddr: %x!!!!!\n",
-  // f->kaddr, page->uaddr);
-
-  // printf("thread name: %s\n", f->t->name);
-  //intr_set_level (old_level);
+  //insert frame successful
   return true;
   
 }
 
-void frame_locker(void *kaddr, size_t size) {
-
-}
