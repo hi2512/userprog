@@ -101,8 +101,6 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
 
     //add for userprog
     struct thread *parent;
@@ -123,6 +121,12 @@ struct thread
     char name_only[16];
 
     struct file *my_file;
+
+    //for project 4
+    struct dir *cur_dir;
+
+    /* Owned by thread.c. */
+    unsigned magic;                     /* Detects stack overflow. */
     
   };
 

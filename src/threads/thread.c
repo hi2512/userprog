@@ -15,7 +15,9 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "threads/malloc.h"
+#include "userprog/syscall.h"
 #endif
+#include "filesys/dir.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -207,6 +209,9 @@ thread_create (const char *name, int priority,
   t->parent = cur;
   sema_init(&t->exec_sem, 0);
   struct exit_status *es = malloc(sizeof(struct exit_status));
+  if(es == NULL) {
+    exit(-1);
+  }
   sema_init(&es->ready, 0);
   es->t = t;
   es->tid = tid;
@@ -214,7 +219,8 @@ thread_create (const char *name, int priority,
   list_push_back (&cur->children, &es->elem);
 
   t->status_in_parent = es;
-
+  //add for filesys
+  t->cur_dir = cur->cur_dir;
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -499,7 +505,8 @@ init_thread (struct thread *t, const char *name, int priority)
   for(i = 0; i < 128; i++) {
     t->files[i] = NULL;
   }
-  
+  //add for project 4
+  t->cur_dir = dir_open_root();
   t->exit_status = -1;
   
   

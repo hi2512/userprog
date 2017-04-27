@@ -22,6 +22,8 @@ check_file_size (int fd, long ofs)
   if (size != ofs)
     fail ("filesize not updated properly: should be %ld, actually %ld",
           ofs, size);
+
+  //printf("filesize is %d\n", size);
 }
 
 void
