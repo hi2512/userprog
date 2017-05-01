@@ -17,7 +17,7 @@
 #include "threads/malloc.h"
 #include "userprog/syscall.h"
 #endif
-#include "filesys/dir.h"
+#include "filesys/directory.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -102,6 +102,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -506,7 +507,7 @@ init_thread (struct thread *t, const char *name, int priority)
     t->files[i] = NULL;
   }
   //add for project 4
-  t->cur_dir = dir_open_root();
+  //t->cur_dir = dir_open_root();
   t->exit_status = -1;
   
   

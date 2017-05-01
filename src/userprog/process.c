@@ -74,7 +74,13 @@ start_process (void *file_name_)
   struct thread *cur = thread_current();
   cur->status_in_parent->load_success = success;
   //printf("finished load\n");
-
+  if(cur->parent->cur_dir == NULL) {
+    //if the parent is the main thread??
+    cur->cur_dir = dir_open_root();
+  } else {
+    //printf("current thread is %s, par is %s\n", cur->name, cur->parent->name);
+    cur->cur_dir = dir_reopen(cur->parent->cur_dir);
+  }
   //process finished loading and mark in parent
   sema_up(&cur->parent->exec_sem);
 

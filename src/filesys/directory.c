@@ -5,6 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir 
@@ -24,9 +25,22 @@ struct dir_entry
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
-dir_create (block_sector_t sector, size_t entry_cnt)
+dir_create (block_sector_t sector, size_t entry_cnt, block_sector_t par_sec)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  bool success = false;
+  //for the 
+  success = inode_create (sector,
+			  sizeof (struct dir_entry) * (entry_cnt + 2), true);
+  if(!success) {
+    return false;
+  }
+  //add . and .. entries
+  struct dir *d = dir_open(inode_open(sector));
+  if( (!dir_add(d, ".", sector)) || (!dir_add(d, "..", par_sec)) ) {
+    return false;
+  }
+  dir_close(d);
+  return success;
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -48,6 +62,39 @@ dir_open (struct inode *inode)
       return NULL; 
     }
 }
+
+struct dir * dir_open_path(char *filename) {
+
+  //COPY SO NAME NOT DESTROYED
+  char * namecopy = calloc(1, strlen(filename) + 1);
+  strlcpy(namecopy, filename, strlen(filename) + 1);
+  /*
+  char * endslash = strrchr(namecopy, "/");
+  if(endslash == NULL) {
+    return NULL;
+  }
+  */
+  //get directory to start at
+  struct dir * res == NULL;
+  if( (filename[0] == "/") || thread_current()->cur_dir == NULL) {
+    res = dir_open_root();
+  } else {
+    res = dir_reopen(thread_current()->cur_dir);
+    
+  }
+  char *tok, *sv_ptr;
+
+  for(tok = strtok_t(namecopy, "/", &sv_ptr); tok != NULL;
+      tok = strtok_t(NULL, "/", &sv_ptr) ) {
+    //tok is the directory to check
+
+    
+  }
+    
+  
+}
+
+
 
 /* Opens the root directory and returns a directory for it.
    Return true if successful, false on failure. */
