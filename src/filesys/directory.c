@@ -85,8 +85,8 @@ struct dir * dir_open_path(char *filename) {
   }
   char *tok, *sv_ptr;
 
-  for(tok = strtok_t(namecopy, "/", &sv_ptr); tok != NULL;
-      tok = strtok_t(NULL, "/", &sv_ptr) ) {
+  for(tok = strtok_r(namecopy, "/", &sv_ptr); tok != NULL;
+      tok = strtok_r(NULL, "/", &sv_ptr) ) {
     //tok is the directory to check
     printf("dir to check is %s\n", tok);
     struct inode *i = NULL;

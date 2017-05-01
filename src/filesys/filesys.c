@@ -7,6 +7,7 @@
 #include "filesys/inode.h"
 #include "filesys/directory.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -49,12 +50,26 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   block_sector_t inode_sector = 0;
   //struct dir *dir = dir_open_root ();
   //get the dir
-  struct dir *dir = dir_open_path(name);
+  struct dir * dir = NULL;
   char *filename = calloc(1, strlen(name) + 1);
   strlcpy(filename, name, strlen(name) + 1);
-  printf("full line is %s\n", name);
-  printf("copy line is %s\n", filename);
-  filename = strrchr(filename, "/") + 1;
+
+  char *end_pointer = strrchr(filename, "/");
+  if(end_pointer == NULL) {
+    if(thread_current()->cur_dir == NULL) {
+      dir = dir_open_root();
+    } else {
+      dir = dir_reopen(thread_current()->cur_dir);
+    }
+
+  } else {
+     dir = dir_open_path(name);
+      
+     printf("full line is %s\n", name);
+     printf("copy line is %s\n", filename);
+     filename = end_pointer + 1;
+
+  }
   printf("just the file is %s\n", filename);
   
   bool success = (dir != NULL
@@ -67,6 +82,8 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 
   return success;
 }
+
+
 
 /* Opens the file with the given NAME.
    Returns the new file if successful or a null pointer
