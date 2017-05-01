@@ -68,14 +68,15 @@ struct dir * dir_open_path(char *filename) {
   //COPY SO NAME NOT DESTROYED
   char * namecopy = calloc(1, strlen(filename) + 1);
   strlcpy(namecopy, filename, strlen(filename) + 1);
-  /*
+  
   char * endslash = strrchr(namecopy, "/");
   if(endslash == NULL) {
     return NULL;
   }
-  */
+  printf("endslash is %s\n", endslash);
+  
   //get directory to start at
-  struct dir * res == NULL;
+  struct dir * res = NULL;
   if( (filename[0] == "/") || thread_current()->cur_dir == NULL) {
     res = dir_open_root();
   } else {
@@ -87,11 +88,20 @@ struct dir * dir_open_path(char *filename) {
   for(tok = strtok_t(namecopy, "/", &sv_ptr); tok != NULL;
       tok = strtok_t(NULL, "/", &sv_ptr) ) {
     //tok is the directory to check
-
-    
+    printf("dir to check is %s\n", tok);
+    struct inode *i = NULL;
+    if(!dir_lookup(res, tok, &i)) {
+      return NULL;
+    }
+    struct dir *temp = dir_open(i);
+    dir_close(res);
+    if(temp == NULL) {
+      return NULL;
+    }
+    res = temp;
   }
     
-  
+  return res;
 }
 
 

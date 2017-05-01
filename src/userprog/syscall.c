@@ -198,7 +198,8 @@ bool create(const char *file, unsigned initial_size) {
     exit(-1);
   }
   lock_acquire(&file_lock);
-  bool res = filesys_create(file, initial_size);
+  //CHANGED HERE, NOT A DIRECTORY?
+  bool res = filesys_create(file, initial_size, false);
   lock_release(&file_lock);
   return res;
 }
