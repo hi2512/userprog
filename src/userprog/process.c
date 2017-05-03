@@ -181,7 +181,7 @@ process_exit (void)
   file_close(cur->my_file);
   int i;
   for(i = 0; i < 128; i++) {
-    struct file *f = cur->files[i];
+    struct file *f = cur->f_d.files[i];
     if(f != NULL) {
       file_close(f);
     }

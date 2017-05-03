@@ -31,15 +31,9 @@ struct inode_disk
     //uint32_t unused[125];               /* Not used. */
     
   };
-/*
-struct indirection_block {
-  block_sector_t sectors[128];
-};
 
-struct second_level_block {
-  block_sector_t blocks[128];
-};
-*/
+
+
 /* Returns the number of sectors to allocate for an inode SIZE
    bytes long. */
 static inline size_t
@@ -49,19 +43,24 @@ bytes_to_sectors (off_t size)
 }
 
 /* In-memory inode. */
+
 struct inode 
   {
-    struct list_elem elem;              /* Element in inode list. */
-    block_sector_t sector;              /* Sector number of disk location. */
-    int open_cnt;                       /* Number of openers. */
-    bool removed;                       /* True if deleted, false otherwise. */
-    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    struct inode_disk data;             /* Inode content. */
-    bool directory;
+    struct list_elem elem;              
+    block_sector_t sector;             
+    int open_cnt;                      
+    bool removed;                      
+    int deny_write_cnt;                 
+    struct inode_disk data;            
+    // bool directory;
 
     //add here
     struct lock i_lock;
   };
+
+bool inode_is_dir(struct inode *i) {
+  return i->data.directory;
+}
 
 /* Returns the block device sector that contains byte offset POS
    within INODE.
@@ -170,6 +169,7 @@ inode_create (block_sector_t sector, off_t length, bool dir)
 
       disk_inode->first_level = 0xffffffff;
       disk_inode->second_level = 0xffffffff;
+      disk_inode->directory = dir;
       /*
       if (free_map_allocate (sectors, &disk_inode->direct)) 
         {

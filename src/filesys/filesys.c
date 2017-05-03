@@ -54,7 +54,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   char *filename = calloc(1, strlen(name) + 1);
   strlcpy(filename, name, strlen(name) + 1);
 
-  char *end_pointer = strrchr(filename, "/");
+  char *end_pointer = strrchr(filename, '/');
   if(end_pointer == NULL) {
     if(thread_current()->cur_dir == NULL) {
       dir = dir_open_root();
@@ -70,7 +70,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
      filename = end_pointer + 1;
 
   }
-  printf("just the file is %s\n", filename);
+  //printf("just the file is %s\n", filename);
   
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
@@ -93,11 +93,32 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 struct file *
 filesys_open (const char *name)
 {
-  struct dir *dir = dir_open_root ();
+  //struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
+  struct dir * dir = NULL;
+  char *filename = calloc(1, strlen(name) + 1);
+  strlcpy(filename, name, strlen(name) + 1);
+
+  char *end_pointer = strrchr(filename, '/');
+  if(end_pointer == NULL) {
+    if(thread_current()->cur_dir == NULL) {
+      dir = dir_open_root();
+    } else {
+      dir = dir_reopen(thread_current()->cur_dir);
+    }
+
+  } else {
+     dir = dir_open_path(name);
+      
+     printf("full line is %s\n", name);
+     printf("copy line is %s\n", filename);
+     filename = end_pointer + 1;
+
+  }
+  //printf("just the file is %s\n", filename);
 
   if (dir != NULL)
-    dir_lookup (dir, name, &inode);
+    dir_lookup (dir, filename, &inode);
   dir_close (dir);
 
   return file_open (inode);

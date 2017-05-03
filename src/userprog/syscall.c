@@ -8,6 +8,8 @@
 #include "threads/synch.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "filesys/directory.h"
+#include "filesys/inode.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -21,6 +23,11 @@ bool remove(const char *file);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
+bool chdir(const char *dir);
+bool mkdir(const char *dir);
+bool readdir(int fd, char *name);
+bool isdir(int fd);
+int inumber(int fd);
 
 bool is_mapped(int *esp);
 
@@ -114,6 +121,21 @@ syscall_handler (struct intr_frame *f)
     case SYS_CLOSE :
       close(*arg(a, 1));
       break;
+    case SYS_CHDIR :
+      f->eax = chdir(*arg(a, 1));
+      break;
+    case SYS_MKDIR :
+      f->eax = mkdir(*arg(a, 1));
+      break;
+    case SYS_READDIR :
+      f->eax = readdir(*arg(a, 1), *arg(a, 2));
+      break;
+    case SYS_ISDIR :
+      f->eax = isdir(*arg(a, 1));
+      break;
+    case SYS_INUMBER :
+      f->eax = inumber(*arg(a, 1));
+      break;
   }
   
   
@@ -124,6 +146,49 @@ void halt() {
 
   shutdown_power_off();
 
+}
+
+bool chdir(const char *dir) {
+  struct thread *cur = thread_current();
+  struct dir *d = dir_open_path(dir);
+  if(d == NULL) {
+    return false;
+  }
+  dir_close(cur->cur_dir);
+  cur->cur_dir = d;
+  return true;
+  
+}
+
+bool mkdir(const char *dir) {
+  lock_acquire(&file_lock);
+  bool success = filesys_create(dir, 0, true);
+  lock_release(&file_lock);
+  return success;
+}
+
+bool readdir(int fd, char *name) {
+  struct dir *d = thread_current()->f_d.dirs[(fd - 2)];
+  if( (d == NULL) || (!is_dir(dir_get_inode(d))) ) {
+    return false;
+  }
+  return dir_readdir(d, name);
+}
+
+bool isdir(int fd) {
+  struct dir *d = thread_current()->f_d.dirs[(fd - 2)];
+  if(d == NULL) {
+    return false;
+  }
+  return is_dir(dir_get_inode(d));
+}
+
+int inumber(int fd) {
+  struct dir *d = thread_current()->f_d.dirs[(fd - 2)];
+  if(d == NULL) {
+    return false;
+  }
+  return (int) inode_get_inumber(dir_get_inode(d));
 }
 
 //function to get exit_status from a tid
@@ -224,9 +289,9 @@ int add_file(struct file *f) {
   int i;
   //128 b/c file limit
   for(i = 0; i < 128; i++) {
-    if(cur->files[i] == NULL) {
+    if(cur->f_d.files[i] == NULL) {
       //there is an open spot
-      cur->files[i] = f;
+      cur->f_d.files[i] = f;
       //plus 2 to count for 0 and 1
       fd = i + 2;
       break;
@@ -259,7 +324,7 @@ int open(const char *file) {
 int filesize(int fd) {
 
   lock_acquire(&file_lock);
-  struct file *f = thread_current()->files[(fd - 2)];
+  struct file *f = thread_current()->f_d.files[(fd - 2)];
   if(f == NULL) {
     //no file here
     lock_release(&file_lock);
@@ -293,7 +358,7 @@ int read(int fd, void *buffer, unsigned size) {
     lock_release(&file_lock);
     return size;
   }
-  struct file *f = thread_current()->files[(fd - 2)];
+  struct file *f = thread_current()->f_d.files[(fd - 2)];
   if(f == NULL) {
     lock_release(&file_lock);
     return -1;
@@ -325,7 +390,7 @@ int write(int fd, const void *buffer, unsigned size) {
   }
   //else get file
   //fd - 2
-   struct file *write_loc = thread_current()->files[(fd - 2)];
+   struct file *write_loc = thread_current()->f_d.files[(fd - 2)];
   if(write_loc == NULL) {
     //no file here
     lock_release(&file_lock);
@@ -341,14 +406,14 @@ int write(int fd, const void *buffer, unsigned size) {
 void seek(int fd, unsigned position) {
 
   lock_acquire(&file_lock);
-  file_seek(thread_current()->files[(fd - 2)], position);
+  file_seek(thread_current()->f_d.files[(fd - 2)], position);
   lock_release(&file_lock);
 }
 
 unsigned tell(int fd) {
 
   lock_acquire(&file_lock);
-  unsigned res = (unsigned) file_tell(thread_current()->files[(fd - 2)]);
+  unsigned res = (unsigned) file_tell(thread_current()->f_d.files[(fd - 2)]);
   lock_release(&file_lock);
   return res;
   
@@ -361,10 +426,10 @@ void close(int fd) {
   }
   lock_acquire(&file_lock);
   struct thread *cur = thread_current();
-  struct file *f = cur->files[(fd - 2)];
+  struct file *f = cur->f_d.files[(fd - 2)];
   if( (f != NULL) ) {
     file_close(f);
-    cur->files[fd - 2] = NULL;
+    cur->f_d.files[fd - 2] = NULL;
   }
   lock_release(&file_lock);
 }

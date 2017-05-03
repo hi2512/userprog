@@ -6,7 +6,21 @@
 #include "devices/block.h"
 
 struct bitmap;
+/*
+struct inode 
+  {
+    struct list_elem elem;              
+    block_sector_t sector;             
+    int open_cnt;                      
+    bool removed;                      
+    int deny_write_cnt;                 
+    struct inode_disk data;            
+    // bool directory;
 
+    //add here
+    struct lock i_lock;
+  };
+*/
 void inode_init (void);
 bool inode_create (block_sector_t, off_t, bool);
 struct inode *inode_open (block_sector_t);

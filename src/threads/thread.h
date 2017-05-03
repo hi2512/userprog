@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "filesys/directory.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -113,7 +114,11 @@ struct thread
 
     //all open files in a thread
     //128 limit from slides
-    struct file *files[128];
+    union {
+      struct file *files[128];
+      struct dir *dirs[128];
+    } f_d ;
+
     
     int exit_status;
 

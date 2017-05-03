@@ -12,6 +12,7 @@ struct dir
   {
     struct inode *inode;                /* Backing store. */
     off_t pos;                          /* Current position. */
+    bool unused;
   };
 
 /* A single directory entry. */
@@ -69,10 +70,14 @@ struct dir * dir_open_path(char *filename) {
   char * namecopy = calloc(1, strlen(filename) + 1);
   strlcpy(namecopy, filename, strlen(filename) + 1);
   
-  char * endslash = strrchr(namecopy, "/");
+  char * endslash = strrchr(namecopy, '/');
   if(endslash == NULL) {
-    return NULL;
+    if(thread_current()->cur_dir == NULL)
+      return dir_open_root();
+    else
+      return dir_reopen(thread_current()->cur_dir);
   }
+  printf("");
   printf("endslash is %s\n", endslash);
   
   //get directory to start at
@@ -85,7 +90,7 @@ struct dir * dir_open_path(char *filename) {
   }
   char *tok, *sv_ptr;
 
-  for(tok = strtok_r(namecopy, "/", &sv_ptr); tok != NULL;
+  for(tok = strtok_r(namecopy, "/", &sv_ptr); (tok != NULL);
       tok = strtok_r(NULL, "/", &sv_ptr) ) {
     //tok is the directory to check
     printf("dir to check is %s\n", tok);
@@ -100,7 +105,7 @@ struct dir * dir_open_path(char *filename) {
     }
     res = temp;
   }
-    
+  
   return res;
 }
 
@@ -290,4 +295,8 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
         } 
     }
   return false;
+}
+
+bool is_dir(struct inode *i) {
+  return inode_is_dir(i);
 }

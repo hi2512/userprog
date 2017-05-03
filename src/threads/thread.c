@@ -504,7 +504,7 @@ init_thread (struct thread *t, const char *name, int priority)
   
   int i;
   for(i = 0; i < 128; i++) {
-    t->files[i] = NULL;
+    t->f_d.files[i] = NULL;
   }
   //add for project 4
   //t->cur_dir = dir_open_root();
