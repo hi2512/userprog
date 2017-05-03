@@ -12,7 +12,7 @@ struct dir
   {
     struct inode *inode;                /* Backing store. */
     off_t pos;                          /* Current position. */
-    bool unused;
+    bool deny_write;
   };
 
 /* A single directory entry. */
@@ -69,7 +69,7 @@ struct dir * dir_open_path(char *filename) {
   //COPY SO NAME NOT DESTROYED
   char * namecopy = calloc(1, strlen(filename) + 1);
   strlcpy(namecopy, filename, strlen(filename) + 1);
-  
+  /*
   char * endslash = strrchr(namecopy, '/');
   if(endslash == NULL) {
     if(thread_current()->cur_dir == NULL)
@@ -79,10 +79,11 @@ struct dir * dir_open_path(char *filename) {
   }
   printf("");
   printf("endslash is %s\n", endslash);
-  
+  */
+   printf("DIR OPEN PATH: %s\n", filename);
   //get directory to start at
   struct dir * res = NULL;
-  if( (filename[0] == "/") || thread_current()->cur_dir == NULL) {
+  if( (filename[0] == '/') || thread_current()->cur_dir == NULL) {
     res = dir_open_root();
   } else {
     res = dir_reopen(thread_current()->cur_dir);
@@ -93,7 +94,7 @@ struct dir * dir_open_path(char *filename) {
   for(tok = strtok_r(namecopy, "/", &sv_ptr); (tok != NULL);
       tok = strtok_r(NULL, "/", &sv_ptr) ) {
     //tok is the directory to check
-    printf("dir to check is %s\n", tok);
+    // printf("dir to check is %s\n", tok);
     struct inode *i = NULL;
     if(!dir_lookup(res, tok, &i)) {
       return NULL;
@@ -181,6 +182,7 @@ bool
 dir_lookup (const struct dir *dir, const char *name,
             struct inode **inode) 
 {
+  printf("dir lookup with %s\n", name);
   struct dir_entry e;
 
   ASSERT (dir != NULL);

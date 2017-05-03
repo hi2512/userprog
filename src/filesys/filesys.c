@@ -63,19 +63,26 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
     }
 
   } else {
-     dir = dir_open_path(name);
+    char *just_path =  calloc(1, strlen(name) + 1);
+    strlcpy(just_path, filename, strlen(name) + 1);
+    char *ep = strrchr(just_path, '/');
+    //  printf("ep is : %s\n", ep);
+    *ep = '\0';
+    //printf("ep is : %s\n", ep);
+    
+     dir = dir_open_path(just_path);
       
-     printf("full line is %s\n", name);
-     printf("copy line is %s\n", filename);
+     //printf("full line is %s\n", name);
+     // printf("copy line is %s\n", filename);
      filename = end_pointer + 1;
 
   }
-  //printf("just the file is %s\n", filename);
+  // printf("just the file is %s\n", filename);
   
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size, is_dir)
-                  && dir_add (dir, name, inode_sector));
+                  && dir_add (dir, filename, inode_sector));
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
@@ -108,17 +115,31 @@ filesys_open (const char *name)
     }
 
   } else {
-     dir = dir_open_path(name);
-      
-     printf("full line is %s\n", name);
-     printf("copy line is %s\n", filename);
+    if(!strcmp(filename, "/")) {
+      dir = dir_open_root();
+      // goto NEXT;
+    }
+    else{
+    char *just_path =  calloc(1, strlen(name) + 1);
+    strlcpy(just_path, filename, strlen(name) + 1);
+    char *ep = strrchr(just_path, '/');
+
+    *ep = '\0';
+    
+     dir = dir_open_path(just_path);
+    }
+     //printf("full line is %s\n", name);
+     //printf("copy line is %s\n", filename);
      filename = end_pointer + 1;
 
   }
   //printf("just the file is %s\n", filename);
-
+ NEXT:
   if (dir != NULL)
     dir_lookup (dir, filename, &inode);
+
+  printf("finished dir lookup\n");
+  //ASSERT(inode != NULL)
   dir_close (dir);
 
   return file_open (inode);

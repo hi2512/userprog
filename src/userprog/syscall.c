@@ -390,6 +390,10 @@ int write(int fd, const void *buffer, unsigned size) {
   }
   //else get file
   //fd - 2
+  if(isdir(fd)) {
+    lock_release(&file_lock);
+    return -1;
+  }
    struct file *write_loc = thread_current()->f_d.files[(fd - 2)];
   if(write_loc == NULL) {
     //no file here
