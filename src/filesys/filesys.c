@@ -47,6 +47,10 @@ filesys_done (void)
 bool
 filesys_create (const char *name, off_t initial_size, bool is_dir) 
 {
+  if(strlen(name) == 0) {
+    return false;
+  }
+  
   block_sector_t inode_sector = 0;
   //struct dir *dir = dir_open_root ();
   //get the dir
@@ -57,7 +61,6 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   char *end_pointer = strrchr(filename, '/');
   if(end_pointer == NULL) {
     if(thread_current()->cur_dir == NULL) {
-      printf("DIR is root\n");
       dir = dir_open_root();
     } else {
       dir = dir_reopen(thread_current()->cur_dir);
@@ -78,24 +81,26 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
      filename = end_pointer + 1;
 
   }
-  // printf("just the file is %s\n", filename);
-  
+  //printf("just the file is %s\n", filename);
+  /*
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector) );
                   //&& inode_create (inode_sector, initial_size, is_dir)
-                  //&& dir_add (dir, filename, inode_sector));
+		  // && dir_add (dir, filename, inode_sector));
+		  */
   bool inode_add = false;
   if(is_dir) {
     inode_add = dir_create(inode_sector, 0,
 		inode_get_inumber(dir_get_inode(thread_current()->cur_dir)) )
       && dir_add (dir, filename, inode_sector);
   } else {
-    inode_add = inode_create(inode_sector, initial_size, is_dir) &&
+    inode_add = inode_create(inode_sector, 0, is_dir) &&
     dir_add (dir, filename, inode_sector);
   }
+  
 
   
-  if (!(success && inode_add) && inode_sector != 0) 
+  if (!(success) && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
 
@@ -141,18 +146,19 @@ filesys_open (const char *name)
      filename = end_pointer + 1;
 
   }
-  printf("just the file is %s\n", filename);
+  // printf("just the file is %s\n", filename);
   if( strlen(filename) == 0) {
     //file is the directory
     inode = dir_get_inode(dir);
   } else {
-  
+ 
+
     if (dir != NULL)
       dir_lookup (dir, filename, &inode);
 
-    printf("finished dir lookup\n");
+    // printf("finished dir lookup\n");
     if(inode == NULL) {
-      printf("INODE IS NULL\n");
+      // printf("INODE IS NULL\n");
     }
   //ASSERT(inode != NULL)
     dir_close (dir);
@@ -193,10 +199,15 @@ filesys_remove (const char *name)
      filename = end_pointer + 1;
 
   }
-  
+
+  //printf("just the file is %s\n", filename);
+  // printf("cwd is: %d\n",
+  //	 inode_get_inumber(dir_get_inode(thread_current()->cur_dir)) );
   bool success = dir != NULL && dir_remove (dir, filename);
+ 
+  
   dir_close (dir); 
-  printf("FILESYS remove success: %d\n", success);
+  //printf("FILESYS remove success: %d\n", success);
   return success;
 }
 

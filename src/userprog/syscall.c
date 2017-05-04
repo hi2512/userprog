@@ -150,6 +150,13 @@ void halt() {
 
 bool chdir(const char *dir) {
   struct thread *cur = thread_current();
+  /*
+  char *just_path =  calloc(1, strlen(dir) + 1);
+  strlcpy(just_path, dir, strlen(dir) + 1);
+  char *ep = strrchr(just_path, '/');
+
+  *ep = '\0';
+  */
   struct dir *d = dir_open_path(dir);
   if(d == NULL) {
     return false;
@@ -401,6 +408,7 @@ int write(int fd, const void *buffer, unsigned size) {
     lock_release(&file_lock);
     return -1;
   } else {
+
     int res = file_write(write_loc, buffer, size);
     lock_release(&file_lock);
     return res;

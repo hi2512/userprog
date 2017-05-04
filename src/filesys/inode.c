@@ -702,6 +702,10 @@ inode_allow_write (struct inode *inode)
   inode->deny_write_cnt--;
 }
 
+int inode_open_c(struct inode *i) {
+  return i->open_cnt;
+}
+
 /* Returns the length, in bytes, of INODE's data. */
 off_t
 inode_length (const struct inode *inode)

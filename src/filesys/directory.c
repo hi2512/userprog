@@ -28,20 +28,22 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt, block_sector_t par_sec)
 {
-  printf("dir create called\n");
+  // printf("dir create called, sector %d, par_sec %d\n", sector, par_sec);
   bool success = false;
   //for the 
   success = inode_create (sector,
-			  sizeof (struct dir_entry) * (entry_cnt + 2), true);
+			  sizeof (struct dir_entry) *  2, true);
   if(!success) {
     return false;
   }
   //add . and .. entries
+  
   struct dir *d = dir_open(inode_open(sector));
   if( (!dir_add(d, ".", sector)) || (!dir_add(d, "..", par_sec)) ) {
     return false;
   }
   dir_close(d);
+  
   return success;
 }
 
@@ -81,12 +83,15 @@ struct dir * dir_open_path(char *filename) {
   printf("");
   printf("endslash is %s\n", endslash);
   */
-   printf("DIR OPEN PATH: %s\n", filename);
+  //printf("DIR OPEN PATH: %s\n", filename);
   //get directory to start at
   struct dir * res = NULL;
+  /*
   if( (filename[0] == '/') || thread_current()->cur_dir == NULL
       || (strlen(filename) == 0) ) {
-    printf("DIR is the root\n");
+  */
+  if( (filename[0] == '/') 
+      || (strlen(filename) == 0) ) {
     res = dir_open_root();
   } else {
     res = dir_reopen(thread_current()->cur_dir);
@@ -259,6 +264,7 @@ dir_remove (struct dir *dir, const char *name)
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
+
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
@@ -267,6 +273,17 @@ dir_remove (struct dir *dir, const char *name)
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
+
+  
+  // printf("XXdir's inumber %d\n",inode_get_inumber(inode) );
+  //printf("XXcwd's inumber %d\n",inode_get_inumber
+  //	 (dir_get_inode((thread_current()->cur_dir) )));
+  if( (inode_get_inumber(inode) ==
+       inode_get_inumber(dir_get_inode(thread_current()->cur_dir))) ||
+      (inode_open_c(inode) > 0) ) {
+    goto done;
+  }
+  
 
   /* Erase directory entry. */
   e.in_use = false;
@@ -295,7 +312,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
-      if (e.in_use)
+      if (e.in_use && (!strcmp(e.name, ".")) && (!strcmp(e.name, "..")) )
         {
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;
