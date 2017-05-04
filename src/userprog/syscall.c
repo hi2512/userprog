@@ -275,6 +275,7 @@ bool remove(const char *file) {
 
   lock_acquire(&file_lock);
   bool res = filesys_remove(file);
+  //printf("SYSCALL remove success: %d\n", res);
   lock_release(&file_lock);
   return res;
 }

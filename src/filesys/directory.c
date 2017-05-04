@@ -28,6 +28,7 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt, block_sector_t par_sec)
 {
+  printf("dir create called\n");
   bool success = false;
   //for the 
   success = inode_create (sector,
@@ -83,7 +84,9 @@ struct dir * dir_open_path(char *filename) {
    printf("DIR OPEN PATH: %s\n", filename);
   //get directory to start at
   struct dir * res = NULL;
-  if( (filename[0] == '/') || thread_current()->cur_dir == NULL) {
+  if( (filename[0] == '/') || thread_current()->cur_dir == NULL
+      || (strlen(filename) == 0) ) {
+    printf("DIR is the root\n");
     res = dir_open_root();
   } else {
     res = dir_reopen(thread_current()->cur_dir);
@@ -182,7 +185,7 @@ bool
 dir_lookup (const struct dir *dir, const char *name,
             struct inode **inode) 
 {
-  printf("dir lookup with %s\n", name);
+  //printf("dir lookup with %s\n", name);
   struct dir_entry e;
 
   ASSERT (dir != NULL);
@@ -276,6 +279,8 @@ dir_remove (struct dir *dir, const char *name)
 
  done:
   inode_close (inode);
+
+
   return success;
 }
 

@@ -1,4 +1,4 @@
-#include "filesys/filesys.h"
+ #include "filesys/filesys.h"
 #include <debug.h>
 #include <stdio.h>
 #include <string.h>
@@ -57,6 +57,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   char *end_pointer = strrchr(filename, '/');
   if(end_pointer == NULL) {
     if(thread_current()->cur_dir == NULL) {
+      printf("DIR is root\n");
       dir = dir_open_root();
     } else {
       dir = dir_reopen(thread_current()->cur_dir);
@@ -80,10 +81,21 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   // printf("just the file is %s\n", filename);
   
   bool success = (dir != NULL
-                  && free_map_allocate (1, &inode_sector)
-                  && inode_create (inode_sector, initial_size, is_dir)
-                  && dir_add (dir, filename, inode_sector));
-  if (!success && inode_sector != 0) 
+                  && free_map_allocate (1, &inode_sector) );
+                  //&& inode_create (inode_sector, initial_size, is_dir)
+                  //&& dir_add (dir, filename, inode_sector));
+  bool inode_add = false;
+  if(is_dir) {
+    inode_add = dir_create(inode_sector, 0,
+		inode_get_inumber(dir_get_inode(thread_current()->cur_dir)) )
+      && dir_add (dir, filename, inode_sector);
+  } else {
+    inode_add = inode_create(inode_sector, initial_size, is_dir) &&
+    dir_add (dir, filename, inode_sector);
+  }
+
+  
+  if (!(success && inode_add) && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
 
@@ -115,11 +127,7 @@ filesys_open (const char *name)
     }
 
   } else {
-    if(!strcmp(filename, "/")) {
-      dir = dir_open_root();
-      // goto NEXT;
-    }
-    else{
+    
     char *just_path =  calloc(1, strlen(name) + 1);
     strlcpy(just_path, filename, strlen(name) + 1);
     char *ep = strrchr(just_path, '/');
@@ -127,21 +135,28 @@ filesys_open (const char *name)
     *ep = '\0';
     
      dir = dir_open_path(just_path);
-    }
+    
      //printf("full line is %s\n", name);
      //printf("copy line is %s\n", filename);
      filename = end_pointer + 1;
 
   }
-  //printf("just the file is %s\n", filename);
- NEXT:
-  if (dir != NULL)
-    dir_lookup (dir, filename, &inode);
+  printf("just the file is %s\n", filename);
+  if( strlen(filename) == 0) {
+    //file is the directory
+    inode = dir_get_inode(dir);
+  } else {
+  
+    if (dir != NULL)
+      dir_lookup (dir, filename, &inode);
 
-  printf("finished dir lookup\n");
+    printf("finished dir lookup\n");
+    if(inode == NULL) {
+      printf("INODE IS NULL\n");
+    }
   //ASSERT(inode != NULL)
-  dir_close (dir);
-
+    dir_close (dir);
+  }
   return file_open (inode);
 }
 
@@ -152,10 +167,36 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  struct dir *dir = dir_open_root ();
-  bool success = dir != NULL && dir_remove (dir, name);
-  dir_close (dir); 
+  //struct dir *dir = dir_open_root ();
+  struct dir * dir = NULL;
+  char *filename = calloc(1, strlen(name) + 1);
+  strlcpy(filename, name, strlen(name) + 1);
 
+  char *end_pointer = strrchr(filename, '/');
+  if(end_pointer == NULL) {
+    if(thread_current()->cur_dir == NULL) {
+      dir = dir_open_root();
+    } else {
+      dir = dir_reopen(thread_current()->cur_dir);
+    }
+
+  } else {
+    
+    char *just_path =  calloc(1, strlen(name) + 1);
+    strlcpy(just_path, filename, strlen(name) + 1);
+    char *ep = strrchr(just_path, '/');
+
+    *ep = '\0';
+    
+     dir = dir_open_path(just_path);
+    
+     filename = end_pointer + 1;
+
+  }
+  
+  bool success = dir != NULL && dir_remove (dir, filename);
+  dir_close (dir); 
+  printf("FILESYS remove success: %d\n", success);
   return success;
 }
 
