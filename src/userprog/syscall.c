@@ -148,15 +148,9 @@ void halt() {
 
 }
 
+//Eric driving
 bool chdir(const char *dir) {
   struct thread *cur = thread_current();
-  /*
-  char *just_path =  calloc(1, strlen(dir) + 1);
-  strlcpy(just_path, dir, strlen(dir) + 1);
-  char *ep = strrchr(just_path, '/');
-
-  *ep = '\0';
-  */
   struct dir *d = dir_open_path(dir);
   if(d == NULL) {
     return false;
@@ -168,12 +162,12 @@ bool chdir(const char *dir) {
 }
 
 bool mkdir(const char *dir) {
-  lock_acquire(&file_lock);
+
   bool success = filesys_create(dir, 0, true);
-  lock_release(&file_lock);
   return success;
 }
 
+//Zach driving
 bool readdir(int fd, char *name) {
   struct dir *d = thread_current()->f_d.dirs[(fd - 2)];
   if( (d == NULL) || (!is_dir(dir_get_inode(d))) ) {
@@ -262,7 +256,6 @@ int wait(tid_t pid) {
 
   return process_wait(pid);
   
-  
 }
 
 bool create(const char *file, unsigned initial_size) {
@@ -270,10 +263,8 @@ bool create(const char *file, unsigned initial_size) {
   if(!is_mapped(file)) {
     exit(-1);
   }
-  lock_acquire(&file_lock);
   //CHANGED HERE, NOT A DIRECTORY?
   bool res = filesys_create(file, initial_size, false);
-  lock_release(&file_lock);
   return res;
 }
 
@@ -281,10 +272,8 @@ bool create(const char *file, unsigned initial_size) {
 
 bool remove(const char *file) {
 
-  lock_acquire(&file_lock);
   bool res = filesys_remove(file);
   //printf("SYSCALL remove success: %d\n", res);
-  lock_release(&file_lock);
   return res;
 }
 
@@ -318,42 +307,35 @@ int open(const char *file) {
     
   }
   
-  lock_acquire(&file_lock);
   struct file *f = filesys_open(file);
   if(f == NULL) {
-    lock_release(&file_lock);
     return -1;
   }
   int res = add_file(f);
   //mark file as open in the thread
-  lock_release(&file_lock);
   return res;
 }
 
 int filesize(int fd) {
 
-  lock_acquire(&file_lock);
   struct file *f = thread_current()->f_d.files[(fd - 2)];
   if(f == NULL) {
     //no file here
-    lock_release(&file_lock);
     return -1;
   }
   int res = file_length(f);
-  lock_release(&file_lock);
   return res;
 }
 
 
 int read(int fd, void *buffer, unsigned size) {
-
+  
   //check for valid fd and buffer
   if( (fd < 0) || (fd == 1) ||  (fd > 129) ||
       (!addr_valid(buffer)) || !(is_mapped(buffer))  ) {
     exit(-1);
   }
 
- 
   lock_acquire(&file_lock);
   if(fd == 0) {
     int i;
@@ -418,17 +400,11 @@ int write(int fd, const void *buffer, unsigned size) {
 }
 
 void seek(int fd, unsigned position) {
-
-  lock_acquire(&file_lock);
   file_seek(thread_current()->f_d.files[(fd - 2)], position);
-  lock_release(&file_lock);
 }
 
 unsigned tell(int fd) {
-
-  lock_acquire(&file_lock);
   unsigned res = (unsigned) file_tell(thread_current()->f_d.files[(fd - 2)]);
-  lock_release(&file_lock);
   return res;
   
 }
@@ -438,13 +414,11 @@ void close(int fd) {
   if(fd < 2 || fd > 129) {
     exit(-1);
   }
-  lock_acquire(&file_lock);
   struct thread *cur = thread_current();
   struct file *f = cur->f_d.files[(fd - 2)];
   if( (f != NULL) ) {
     file_close(f);
     cur->f_d.files[fd - 2] = NULL;
   }
-  lock_release(&file_lock);
 }
 
