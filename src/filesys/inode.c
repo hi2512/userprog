@@ -59,6 +59,7 @@ struct inode
   };
 
 bool inode_is_dir(struct inode *i) {
+  //printf("inode sector %d, dir %d", i->sector, i->data.directory);
   return i->data.directory;
 }
 
@@ -152,7 +153,7 @@ inode_create (block_sector_t sector, off_t length, bool dir)
   bool success = false;
 
   //printf("inode create: at sector %d and length %d\n", sector, length);
-  
+  //printf("inode create called, dir is %d, sector %d\n", dir, sector);
   ASSERT (length >= 0);
 
   /* If this assertion fails, the inode structure is not exactly

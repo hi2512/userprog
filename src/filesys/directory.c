@@ -291,14 +291,14 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  
+  // (inode_open_c(inode) > 1)
   //printf("XXdir's inumber %d\n",inode_get_inumber(inode) );
   //printf("XXcwd's inumber %d\n",inode_get_inumber
   //	 (dir_get_inode((thread_current()->cur_dir) )));
 //printf("inode's open count %d\n", inode_open_c(inode)  );
   if( (inode_get_inumber(inode) ==
        inode_get_inumber(dir_get_inode(thread_current()->cur_dir))) ||
-      (inode_open_c(inode) > 1) ) {
+      (inode_open_c(inode) > 2)) {
     //printf("DIR IS OPEN OR IS THE CWD\n");
     goto done;
   }
@@ -339,7 +339,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
-      if (e.in_use && (!strcmp(e.name, ".")) && (!strcmp(e.name, "..")) )
+      if (e.in_use && (strcmp(e.name, ".")) && (strcmp(e.name, "..")) )
         {
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;

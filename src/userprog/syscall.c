@@ -180,6 +180,7 @@ bool readdir(int fd, char *name) {
     return false;
   }
   return dir_readdir(d, name);
+
 }
 
 bool isdir(int fd) {
@@ -383,7 +384,6 @@ int read(int fd, void *buffer, unsigned size) {
 
 int write(int fd, const void *buffer, unsigned size) {
 
-
   if( (fd < 1) || (fd > 129) ||  (!addr_valid(buffer)) ||
       !(is_mapped(buffer)) ) {
     exit(-1);
@@ -398,6 +398,7 @@ int write(int fd, const void *buffer, unsigned size) {
   }
   //else get file
   //fd - 2
+  
   if(isdir(fd)) {
     lock_release(&file_lock);
     return -1;
