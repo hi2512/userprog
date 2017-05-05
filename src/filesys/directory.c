@@ -29,6 +29,7 @@ bool
 dir_create (block_sector_t sector, size_t entry_cnt, block_sector_t par_sec)
 {
   // printf("dir create called, sector %d, par_sec %d\n", sector, par_sec);
+
   bool success = false;
   //for the 
   success = inode_create (sector,
@@ -43,7 +44,7 @@ dir_create (block_sector_t sector, size_t entry_cnt, block_sector_t par_sec)
     return false;
   }
   dir_close(d);
-  
+  // printf("DIRCRinode's open count %d\n", inode_open_c(inode)  );
   return success;
 }
 
@@ -250,6 +251,22 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   return success;
 }
 
+bool dir_empty(struct dir *dir) {
+  //took from above function
+  // printf("running dir empty\n");
+  struct dir_entry e;
+  off_t ofs;
+
+  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e) {
+    //printf("checking dir entry name %s XXXXXXX\n", e.name);
+    if (e.in_use && (strcmp(e.name, "."))  && (strcmp(e.name, "..")) ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /* Removes any entry for NAME in DIR.
    Returns true if successful, false on failure,
    which occurs only if there is no file with the given NAME. */
@@ -275,15 +292,25 @@ dir_remove (struct dir *dir, const char *name)
     goto done;
 
   
-  // printf("XXdir's inumber %d\n",inode_get_inumber(inode) );
+  //printf("XXdir's inumber %d\n",inode_get_inumber(inode) );
   //printf("XXcwd's inumber %d\n",inode_get_inumber
   //	 (dir_get_inode((thread_current()->cur_dir) )));
+//printf("inode's open count %d\n", inode_open_c(inode)  );
   if( (inode_get_inumber(inode) ==
        inode_get_inumber(dir_get_inode(thread_current()->cur_dir))) ||
-      (inode_open_c(inode) > 0) ) {
+      (inode_open_c(inode) > 1) ) {
+    //printf("DIR IS OPEN OR IS THE CWD\n");
     goto done;
   }
-  
+
+  struct dir *d = dir_open(inode);
+  if(!dir_empty(d)) {
+    dir_close(d);
+    //printf("DIR IS NOT EMPTY\n");
+    goto done;
+  }
+  //printf("DIR IS EMPTY\n");
+  dir_close(d);
 
   /* Erase directory entry. */
   e.in_use = false;

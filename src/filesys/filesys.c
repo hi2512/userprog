@@ -87,24 +87,28 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
                   && free_map_allocate (1, &inode_sector) );
                   //&& inode_create (inode_sector, initial_size, is_dir)
 		  // && dir_add (dir, filename, inode_sector));
-		  */
+		  */		  
   bool inode_add = false;
   if(is_dir) {
-    inode_add = dir_create(inode_sector, 0,
+    inode_add = (dir != NULL
+                  && free_map_allocate (1, &inode_sector) 
+		  && dir_create(inode_sector, 0,
 		inode_get_inumber(dir_get_inode(thread_current()->cur_dir)) )
-      && dir_add (dir, filename, inode_sector);
+		 && dir_add (dir, filename, inode_sector));
   } else {
-    inode_add = inode_create(inode_sector, 0, is_dir) &&
-    dir_add (dir, filename, inode_sector);
+             inode_add =      (dir != NULL
+                  && free_map_allocate (1, &inode_sector)
+                  && inode_create (inode_sector, initial_size, is_dir)
+		   && dir_add (dir, filename, inode_sector));
   }
   
 
   
-  if (!(success) && inode_sector != 0) 
+  if (!(inode_add) && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
 
-  return success;
+  return inode_add;
 }
 
 
@@ -117,6 +121,10 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 struct file *
 filesys_open (const char *name)
 {
+  if(strlen(name) == 0) {
+    return NULL;
+  }
+  
   //struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
   struct dir * dir = NULL;
