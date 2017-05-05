@@ -8,6 +8,7 @@
 #include "filesys/directory.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -44,6 +45,7 @@ filesys_done (void)
    Returns true if successful, false otherwise.
    Fails if a file named NAME already exists,
    or if internal memory allocation fails. */
+//Zach driving
 bool
 filesys_create (const char *name, off_t initial_size, bool is_dir) 
 {
@@ -55,9 +57,10 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   //struct dir *dir = dir_open_root ();
   //get the dir
   struct dir * dir = NULL;
+  //copy the name
   char *filename = calloc(1, strlen(name) + 1);
   strlcpy(filename, name, strlen(name) + 1);
-
+  //see if is an absolute path
   char *end_pointer = strrchr(filename, '/');
   if(end_pointer == NULL) {
     if(thread_current()->cur_dir == NULL) {
@@ -67,35 +70,31 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
     }
 
   } else {
+    //get just the path
     char *just_path =  calloc(1, strlen(name) + 1);
     strlcpy(just_path, filename, strlen(name) + 1);
     char *ep = strrchr(just_path, '/');
-    //  printf("ep is : %s\n", ep);
+    //mark as end of the string
     *ep = '\0';
-    //printf("ep is : %s\n", ep);
     
      dir = dir_open_path(just_path);
       
-     //printf("full line is %s\n", name);
-     // printf("copy line is %s\n", filename);
+
      filename = end_pointer + 1;
 
   }
-  //printf("just the file is %s\n", filename);
-  /*
-  bool success = (dir != NULL
-                  && free_map_allocate (1, &inode_sector) );
-                  //&& inode_create (inode_sector, initial_size, is_dir)
-		  // && dir_add (dir, filename, inode_sector));
-		  */		  
+ 	  
   bool inode_add = false;
   if(is_dir) {
+    dir_lock_acquire(dir);
     inode_add = (dir != NULL
                   && free_map_allocate (1, &inode_sector) 
 		  && dir_create(inode_sector, 0,
 		inode_get_inumber(dir_get_inode(thread_current()->cur_dir)) )
 		 && dir_add (dir, filename, inode_sector));
+    dir_lock_release(dir);
   } else {
+    //just a file
              inode_add =      (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size, is_dir)
@@ -118,6 +117,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
    otherwise.
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
+//Eric driving
 struct file *
 filesys_open (const char *name)
 {
@@ -130,7 +130,7 @@ filesys_open (const char *name)
   struct dir * dir = NULL;
   char *filename = calloc(1, strlen(name) + 1);
   strlcpy(filename, name, strlen(name) + 1);
-
+//same for this path too
   char *end_pointer = strrchr(filename, '/');
   if(end_pointer == NULL) {
     if(thread_current()->cur_dir == NULL) {
@@ -148,13 +148,9 @@ filesys_open (const char *name)
     *ep = '\0';
     
      dir = dir_open_path(just_path);
-    
-     //printf("full line is %s\n", name);
-     //printf("copy line is %s\n", filename);
      filename = end_pointer + 1;
 
   }
-  // printf("just the file is %s\n", filename);
   if( strlen(filename) == 0) {
     //file is the directory
     inode = dir_get_inode(dir);
@@ -164,11 +160,6 @@ filesys_open (const char *name)
     if (dir != NULL)
       dir_lookup (dir, filename, &inode);
 
-    // printf("finished dir lookup\n");
-    if(inode == NULL) {
-      // printf("INODE IS NULL\n");
-    }
-  //ASSERT(inode != NULL)
     dir_close (dir);
   }
   return file_open (inode);
@@ -208,14 +199,10 @@ filesys_remove (const char *name)
 
   }
 
-  //printf("just the file is %s\n", filename);
-  // printf("cwd is: %d\n",
-  //	 inode_get_inumber(dir_get_inode(thread_current()->cur_dir)) );
   bool success = dir != NULL && dir_remove (dir, filename);
  
   
   dir_close (dir); 
-  //printf("FILESYS remove success: %d\n", success);
   return success;
 }
 

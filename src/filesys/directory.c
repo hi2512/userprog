@@ -6,6 +6,7 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 
 /* A directory. */
 struct dir 
@@ -13,6 +14,7 @@ struct dir
     struct inode *inode;                /* Backing store. */
     off_t pos;                          /* Current position. */
     bool deny_write;
+    struct lock dir_lock;
   };
 
 /* A single directory entry. */
@@ -25,11 +27,11 @@ struct dir_entry
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
+//Eric driving
 bool
 dir_create (block_sector_t sector, size_t entry_cnt, block_sector_t par_sec)
 {
   // printf("dir create called, sector %d, par_sec %d\n", sector, par_sec);
-
   bool success = false;
   //for the 
   success = inode_create (sector,
@@ -58,6 +60,7 @@ dir_open (struct inode *inode)
     {
       dir->inode = inode;
       dir->pos = 0;
+      lock_init(&dir->dir_lock);
       return dir;
     }
   else
@@ -68,29 +71,16 @@ dir_open (struct inode *inode)
     }
 }
 
+//Zach and Eric driving
 struct dir * dir_open_path(char *filename) {
 
   //COPY SO NAME NOT DESTROYED
   char * namecopy = calloc(1, strlen(filename) + 1);
   strlcpy(namecopy, filename, strlen(filename) + 1);
-  /*
-  char * endslash = strrchr(namecopy, '/');
-  if(endslash == NULL) {
-    if(thread_current()->cur_dir == NULL)
-      return dir_open_root();
-    else
-      return dir_reopen(thread_current()->cur_dir);
-  }
-  printf("");
-  printf("endslash is %s\n", endslash);
-  */
-  //printf("DIR OPEN PATH: %s\n", filename);
+  
   //get directory to start at
   struct dir * res = NULL;
-  /*
-  if( (filename[0] == '/') || thread_current()->cur_dir == NULL
-      || (strlen(filename) == 0) ) {
-  */
+
   if( (filename[0] == '/') 
       || (strlen(filename) == 0) ) {
     res = dir_open_root();
@@ -103,7 +93,6 @@ struct dir * dir_open_path(char *filename) {
   for(tok = strtok_r(namecopy, "/", &sv_ptr); (tok != NULL);
       tok = strtok_r(NULL, "/", &sv_ptr) ) {
     //tok is the directory to check
-    // printf("dir to check is %s\n", tok);
     struct inode *i = NULL;
     if(!dir_lookup(res, tok, &i)) {
       return NULL;
@@ -251,15 +240,15 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   return success;
 }
 
+//function to see if dir is empty
+//Eric driving
 bool dir_empty(struct dir *dir) {
   //took from above function
-  // printf("running dir empty\n");
   struct dir_entry e;
   off_t ofs;
 
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) {
-    //printf("checking dir entry name %s XXXXXXX\n", e.name);
     if (e.in_use && (strcmp(e.name, "."))  && (strcmp(e.name, "..")) ) {
       return false;
     }
@@ -270,6 +259,7 @@ bool dir_empty(struct dir *dir) {
 /* Removes any entry for NAME in DIR.
    Returns true if successful, false on failure,
    which occurs only if there is no file with the given NAME. */
+//Zach driving
 bool
 dir_remove (struct dir *dir, const char *name) 
 {
@@ -277,11 +267,12 @@ dir_remove (struct dir *dir, const char *name)
   struct inode *inode = NULL;
   bool success = false;
   off_t ofs;
+  int cd = 2;
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-
+  lock_acquire(&dir->dir_lock);
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
@@ -291,25 +282,18 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  // (inode_open_c(inode) > 1)
-  //printf("XXdir's inumber %d\n",inode_get_inumber(inode) );
-  //printf("XXcwd's inumber %d\n",inode_get_inumber
-  //	 (dir_get_inode((thread_current()->cur_dir) )));
-//printf("inode's open count %d\n", inode_open_c(inode)  );
   if( (inode_get_inumber(inode) ==
        inode_get_inumber(dir_get_inode(thread_current()->cur_dir))) ||
-      (inode_open_c(inode) > 2)) {
-    //printf("DIR IS OPEN OR IS THE CWD\n");
+      (inode_open_c(inode) > cd)) {
     goto done;
   }
 
+//check to see if the dir is empty
   struct dir *d = dir_open(inode);
   if(!dir_empty(d)) {
     dir_close(d);
-    //printf("DIR IS NOT EMPTY\n");
     goto done;
   }
-  //printf("DIR IS EMPTY\n");
   dir_close(d);
 
   /* Erase directory entry. */
@@ -319,6 +303,7 @@ dir_remove (struct dir *dir, const char *name)
 
   /* Remove inode. */
   inode_remove (inode);
+  lock_release(&dir->dir_lock);
   success = true;
 
  done:
@@ -351,3 +336,14 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 bool is_dir(struct inode *i) {
   return inode_is_dir(i);
 }
+
+void dir_lock_acquire(struct dir *d) {
+
+  lock_acquire(&d->dir_lock);
+}
+
+void dir_lock_release(struct dir *d) {
+
+  lock_release(&d->dir_lock);
+}
+
